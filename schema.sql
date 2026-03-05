@@ -1,19 +1,67 @@
 -- ----------------------------
+-- Table structure for user
+-- ----------------------------
+DROP TABLE IF EXISTS `user`;
+CREATE TABLE `user` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `username` varchar(64) NOT NULL COMMENT 'account username',
+  `email` varchar(128) NOT NULL COMMENT 'account email',
+  `password` varchar(128) NOT NULL COMMENT 'encrypted password',
+  `invite_code` varchar(32) NOT NULL COMMENT 'self invite code',
+  `inviter_id` bigint(20) DEFAULT NULL COMMENT 'parent inviter user id',
+  `status` int(2) DEFAULT '1' COMMENT '1 active, 0 disabled',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_username` (`username`),
+  UNIQUE KEY `uk_email` (`email`),
+  UNIQUE KEY `uk_invite_code` (`invite_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='user table';
+
+-- ----------------------------
 -- Table structure for sys_user
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_user`;
 CREATE TABLE `sys_user` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `username` varchar(64) NOT NULL COMMENT '用户名',
-  `password` varchar(128) NOT NULL COMMENT '密码',
-  `email` varchar(128) DEFAULT NULL COMMENT '邮箱',
-  `phone` varchar(32) DEFAULT NULL COMMENT '手机号',
-  `status` int(2) DEFAULT '1' COMMENT '状态 1正常 0禁用',
+  `username` varchar(64) NOT NULL COMMENT 'admin username',
+  `email` varchar(128) NOT NULL COMMENT 'admin email',
+  `password` varchar(128) NOT NULL COMMENT 'encrypted password',
+  `status` int(2) DEFAULT '1' COMMENT '1 active, 0 disabled',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_username` (`username`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+  UNIQUE KEY `uk_sys_username` (`username`),
+  UNIQUE KEY `uk_sys_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='admin user table';
+
+-- ----------------------------
+-- Table structure for sys_config
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_config`;
+CREATE TABLE `sys_config` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `config_key` varchar(128) NOT NULL COMMENT 'config key',
+  `config_value` varchar(512) NOT NULL COMMENT 'config value',
+  `status` int(2) DEFAULT '1' COMMENT '1 active, 0 disabled',
+  `remark` varchar(255) DEFAULT NULL COMMENT 'remark',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_config_key` (`config_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='system config table';
+
+-- ----------------------------
+-- Table structure for banner
+-- ----------------------------
+DROP TABLE IF EXISTS `banner`;
+CREATE TABLE `banner` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `image` varchar(512) NOT NULL COMMENT 'banner image url/path',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='banner table';
 
 -- ----------------------------
 -- Table structure for mining_coin
@@ -118,3 +166,7 @@ INSERT INTO `mining_coin` (`symbol`, `name`, `algorithm`, `pool_hashrate`, `netw
 ('BTC', 'Bitcoin', 'SHA256d', '115.47 EH/s', '1017.05 EH/s', 454691.41, 0.20),
 ('LTC', 'Litecoin', 'Scrypt', '927.28 TH/s', '2.83 PH/s', 365.92, 3.17),
 ('ETHW', 'EthereumPoW', 'Ethash', '907.20 GH/s', '4.89 TH/s', 2.08, 0.0053);
+
+-- Insert default system config for admin registration
+INSERT INTO `sys_config` (`config_key`, `config_value`, `remark`) VALUES
+('admin_register_invite_code', 'ADMIN2026', 'invite code required for sys_user registration');
