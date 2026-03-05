@@ -7,6 +7,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.f2pool.entity.MiningCoin;
 import com.f2pool.service.IMiningCoinService;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,7 +30,7 @@ public class CoinSyncTask {
     // CoinGecko Markets API (高级接口)
     private static final String MARKETS_API = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=cny&ids=bitcoin,litecoin,ethereum-pow-iou,dogecoin,bitcoin-cash,ethereum-classic,kaspa,ravencoin";
 
-    @javax.annotation.PostConstruct
+    @PostConstruct
     public void initCoins() {
         initCoin("DOGE", "Dogecoin", "Scrypt");
         initCoin("BCH", "Bitcoin Cash", "SHA256d");
