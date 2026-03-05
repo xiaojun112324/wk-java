@@ -9,17 +9,18 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
-@TableName("mining_machine")
-public class MiningMachine {
+@TableName("withdraw_order")
+public class WithdrawOrder {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String name;
-    private String coinSymbol;
-    private BigDecimal hashrateValue;
-    private String hashrateUnit;
-    private BigDecimal pricePerUnit;
-    private Integer lockDays;
+    private Long userId;
+    private String asset;
+    private String network;
+    private BigDecimal amountCny;
+    private String receiveAddress;
     private Integer status;
+    private String auditRemark;
+    private Date auditTime;
     private Date createTime;
     private Date updateTime;
 }

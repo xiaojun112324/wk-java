@@ -2,6 +2,7 @@ package com.f2pool.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.f2pool.dto.machine.UserMachineOrderActionRequest;
 import com.f2pool.dto.machine.UserMachineOrderCreateRequest;
 import com.f2pool.entity.MiningCoin;
 import com.f2pool.entity.MiningMachine;
@@ -10,13 +11,16 @@ import com.f2pool.mapper.UserMachineOrderMapper;
 import com.f2pool.service.IMiningCoinService;
 import com.f2pool.service.IMiningMachineService;
 import com.f2pool.service.IUserMachineOrderService;
+import com.f2pool.service.IUserWalletService;
 import com.f2pool.util.HashrateUnitUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,8 +33,11 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
 
     @Autowired
     private IMiningCoinService miningCoinService;
+    @Autowired
+    private IUserWalletService userWalletService;
 
     @Override
+    @Transactional
     public Map<String, Object> createOrder(UserMachineOrderCreateRequest request) {
         validateRequest(request);
 
@@ -47,6 +54,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         BigDecimal hashrateThPerUnit = HashrateUnitUtil.toTH(machine.getHashrateValue(), machine.getHashrateUnit());
         BigDecimal totalHashrateTh = hashrateThPerUnit.multiply(quantityDec).setScale(8, RoundingMode.HALF_UP);
         BigDecimal totalInvest = machine.getPricePerUnit().multiply(quantityDec).setScale(8, RoundingMode.HALF_UP);
+        userWalletService.decreaseBalance(request.getUserId(), totalInvest);
 
         MiningCoin coin = miningCoinService.query()
                 .select("symbol", "daily_revenue_per_t", "price_cny")
@@ -76,6 +84,9 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         order.setTodayRevenueCny(todayRevenueCny);
         order.setTotalRevenueCoin(BigDecimal.ZERO.setScale(18, RoundingMode.HALF_UP));
         order.setTotalRevenueCny(BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP));
+        int lockDays = machine.getLockDays() == null ? 30 : machine.getLockDays();
+        order.setLockUntil(new Date(System.currentTimeMillis() + lockDays * 24L * 60L * 60L * 1000L));
+        order.setSellAmountCny(BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP));
         order.setStatus(1);
         save(order);
 
@@ -107,6 +118,38 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         return buildOrderView(order);
     }
 
+    @Override
+    @Transactional
+    public Map<String, Object> sell(Long id, UserMachineOrderActionRequest request) {
+        UserMachineOrder order = getOrderForOperate(id, request);
+        if (order.getLockUntil() != null && new Date().before(order.getLockUntil())) {
+            throw new IllegalArgumentException("order is still in lock period");
+        }
+        BigDecimal settleAmount = order.getTotalInvest().add(order.getTotalRevenueCny()).setScale(8, RoundingMode.HALF_UP);
+        order.setSellAmountCny(settleAmount);
+        order.setSellTime(new Date());
+        order.setStatus(2);
+        updateById(order);
+        userWalletService.increaseBalance(order.getUserId(), settleAmount);
+        return buildOrderView(order);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> cancel(Long id, UserMachineOrderActionRequest request) {
+        UserMachineOrder order = getOrderForOperate(id, request);
+        if (order.getTotalRevenueCny() != null && order.getTotalRevenueCny().compareTo(BigDecimal.ZERO) > 0) {
+            throw new IllegalArgumentException("order with revenue cannot be canceled");
+        }
+        BigDecimal settleAmount = order.getTotalInvest().setScale(8, RoundingMode.HALF_UP);
+        order.setSellAmountCny(settleAmount);
+        order.setSellTime(new Date());
+        order.setStatus(3);
+        updateById(order);
+        userWalletService.increaseBalance(order.getUserId(), settleAmount);
+        return buildOrderView(order);
+    }
+
     private void validateRequest(UserMachineOrderCreateRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("request body is required");
@@ -120,6 +163,26 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         if (request.getQuantity() == null || request.getQuantity() <= 0) {
             throw new IllegalArgumentException("quantity must be greater than 0");
         }
+    }
+
+    private UserMachineOrder getOrderForOperate(Long id, UserMachineOrderActionRequest request) {
+        if (id == null) {
+            throw new IllegalArgumentException("id is required");
+        }
+        if (request == null || request.getUserId() == null) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        UserMachineOrder order = getById(id);
+        if (order == null) {
+            throw new IllegalArgumentException("order not found");
+        }
+        if (!request.getUserId().equals(order.getUserId())) {
+            throw new IllegalArgumentException("order does not belong to this user");
+        }
+        if (order.getStatus() == null || order.getStatus() != 1) {
+            throw new IllegalArgumentException("order is not in holding status");
+        }
+        return order;
     }
 
     private Map<String, Object> buildOrderView(UserMachineOrder order) {
@@ -139,6 +202,9 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         map.put("todayRevenueCny", order.getTodayRevenueCny());
         map.put("totalRevenueCoin", order.getTotalRevenueCoin());
         map.put("totalRevenueCny", order.getTotalRevenueCny());
+        map.put("lockUntil", order.getLockUntil());
+        map.put("sellAmountCny", order.getSellAmountCny());
+        map.put("sellTime", order.getSellTime());
         map.put("status", order.getStatus());
         map.put("createTime", order.getCreateTime());
         return map;

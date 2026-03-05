@@ -82,6 +82,9 @@ public class MiningMachineServiceImpl extends ServiceImpl<MiningMachineMapper, M
         if (request.getPricePerUnit() == null || request.getPricePerUnit().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("pricePerUnit must be greater than 0");
         }
+        if (request.getLockDays() != null && request.getLockDays() < 0) {
+            throw new IllegalArgumentException("lockDays must be greater than or equal to 0");
+        }
     }
 
     private void fillMachine(MiningMachine machine, MiningMachineSaveRequest request) {
@@ -90,6 +93,7 @@ public class MiningMachineServiceImpl extends ServiceImpl<MiningMachineMapper, M
         machine.setHashrateValue(request.getHashrateValue());
         machine.setHashrateUnit(request.getHashrateUnit().trim().toUpperCase());
         machine.setPricePerUnit(request.getPricePerUnit());
+        machine.setLockDays(request.getLockDays() == null ? 30 : request.getLockDays());
         machine.setStatus(request.getStatus() == null ? 1 : request.getStatus());
     }
 
@@ -101,6 +105,7 @@ public class MiningMachineServiceImpl extends ServiceImpl<MiningMachineMapper, M
         map.put("hashrateValue", machine.getHashrateValue());
         map.put("hashrateUnit", machine.getHashrateUnit());
         map.put("pricePerUnit", machine.getPricePerUnit());
+        map.put("lockDays", machine.getLockDays());
         map.put("status", machine.getStatus());
 
         BigDecimal hashrateTh = HashrateUnitUtil.toTH(machine.getHashrateValue(), machine.getHashrateUnit())

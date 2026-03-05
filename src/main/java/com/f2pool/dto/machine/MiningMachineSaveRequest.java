@@ -11,5 +11,6 @@ public class MiningMachineSaveRequest {
     private BigDecimal hashrateValue;
     private String hashrateUnit;
     private BigDecimal pricePerUnit;
+    private Integer lockDays;
     private Integer status;
 }

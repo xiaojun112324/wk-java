@@ -1,6 +1,7 @@
 package com.f2pool.controller;
 
 import com.f2pool.common.R;
+import com.f2pool.dto.machine.UserMachineOrderActionRequest;
 import com.f2pool.dto.machine.UserMachineOrderCreateRequest;
 import com.f2pool.service.IUserMachineOrderService;
 import io.swagger.annotations.Api;
@@ -35,5 +36,17 @@ public class UserMachineOrderController {
     @GetMapping("/{id}")
     public R<Map<String, Object>> detail(@PathVariable Long id) {
         return R.ok(userMachineOrderService.detail(id));
+    }
+
+    @ApiOperation("Sell machine order after lock period")
+    @PostMapping("/{id}/sell")
+    public R<Map<String, Object>> sell(@PathVariable Long id, @RequestBody UserMachineOrderActionRequest request) {
+        return R.ok(userMachineOrderService.sell(id, request));
+    }
+
+    @ApiOperation("Cancel machine order before revenue settlement")
+    @PostMapping("/{id}/cancel")
+    public R<Map<String, Object>> cancel(@PathVariable Long id, @RequestBody UserMachineOrderActionRequest request) {
+        return R.ok(userMachineOrderService.cancel(id, request));
     }
 }
