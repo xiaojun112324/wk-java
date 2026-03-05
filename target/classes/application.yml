@@ -6,13 +6,14 @@ spring:
     name: f2pool-backend
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/f2pool_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
-    username: root
-    password: root
+    url: jdbc:mysql://121.127.231.209:3306/wk-mysql?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: wk-mysql
+    password: 8P44njJ3WckjxiW7
   redis:
-    host: localhost
+    host: 121.127.231.209
     port: 6379
-    database: 0
+    password: EWdeXZ2SkT73bdQQnW64
+    database: 5
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher

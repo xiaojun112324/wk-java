@@ -64,6 +64,51 @@ CREATE TABLE `banner` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='banner table';
 
 -- ----------------------------
+-- Table structure for mining_machine
+-- ----------------------------
+DROP TABLE IF EXISTS `mining_machine`;
+CREATE TABLE `mining_machine` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `name` varchar(128) NOT NULL COMMENT 'machine name',
+  `coin_symbol` varchar(16) NOT NULL COMMENT 'coin symbol, e.g. BTC',
+  `hashrate_value` decimal(20,8) NOT NULL COMMENT 'single machine hashrate value',
+  `hashrate_unit` varchar(8) NOT NULL COMMENT 'H/KH/MH/GH/TH/PH/EH',
+  `price_per_unit` decimal(20,8) NOT NULL COMMENT 'single machine price',
+  `status` int(2) DEFAULT '1' COMMENT '1 on sale, 0 off sale',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='mining machine table';
+
+-- ----------------------------
+-- Table structure for user_machine_order
+-- ----------------------------
+DROP TABLE IF EXISTS `user_machine_order`;
+CREATE TABLE `user_machine_order` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) NOT NULL COMMENT 'buyer user id',
+  `machine_id` bigint(20) NOT NULL COMMENT 'mining machine id',
+  `coin_symbol` varchar(16) NOT NULL COMMENT 'coin symbol snapshot',
+  `machine_name` varchar(128) NOT NULL COMMENT 'machine name snapshot',
+  `hashrate_value` decimal(20,8) NOT NULL COMMENT 'single machine hashrate snapshot',
+  `hashrate_unit` varchar(8) NOT NULL COMMENT 'H/KH/MH/GH/TH/PH/EH',
+  `quantity` int(11) NOT NULL COMMENT 'buy quantity',
+  `unit_price` decimal(20,8) NOT NULL COMMENT 'unit price snapshot',
+  `total_invest` decimal(20,8) NOT NULL COMMENT 'total invested = unit_price * quantity',
+  `total_hashrate_th` decimal(30,8) NOT NULL COMMENT 'total hashrate converted to TH',
+  `today_revenue_coin` decimal(30,18) DEFAULT '0.000000000000000000' COMMENT 'today revenue in coin',
+  `today_revenue_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'today revenue in CNY',
+  `total_revenue_coin` decimal(30,18) DEFAULT '0.000000000000000000' COMMENT 'accumulated revenue in coin',
+  `total_revenue_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'accumulated revenue in CNY',
+  `status` int(2) DEFAULT '1' COMMENT '1 active, 0 closed',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_machine_id` (`machine_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='user mining machine order table';
+
+-- ----------------------------
 -- Table structure for mining_coin
 -- ----------------------------
 DROP TABLE IF EXISTS `mining_coin`;
