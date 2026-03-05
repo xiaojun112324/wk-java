@@ -48,7 +48,10 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         BigDecimal totalHashrateTh = hashrateThPerUnit.multiply(quantityDec).setScale(8, RoundingMode.HALF_UP);
         BigDecimal totalInvest = machine.getPricePerUnit().multiply(quantityDec).setScale(8, RoundingMode.HALF_UP);
 
-        MiningCoin coin = miningCoinService.query().eq("symbol", machine.getCoinSymbol()).one();
+        MiningCoin coin = miningCoinService.query()
+                .select("symbol", "daily_revenue_per_t", "price_cny")
+                .eq("symbol", machine.getCoinSymbol())
+                .one();
         BigDecimal todayRevenueCoin = BigDecimal.ZERO;
         BigDecimal todayRevenueCny = BigDecimal.ZERO;
         if (coin != null && coin.getDailyRevenuePerT() != null) {

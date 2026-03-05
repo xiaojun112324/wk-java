@@ -107,7 +107,10 @@ public class MiningMachineServiceImpl extends ServiceImpl<MiningMachineMapper, M
                 .setScale(8, RoundingMode.HALF_UP);
         map.put("hashrateTH", hashrateTh);
 
-        MiningCoin coin = miningCoinService.query().eq("symbol", machine.getCoinSymbol()).one();
+        MiningCoin coin = miningCoinService.query()
+                .select("symbol", "daily_revenue_per_t", "price_cny")
+                .eq("symbol", machine.getCoinSymbol())
+                .one();
         BigDecimal dailyCoin = BigDecimal.ZERO;
         BigDecimal dailyCny = BigDecimal.ZERO;
         if (coin != null && coin.getDailyRevenuePerT() != null) {
