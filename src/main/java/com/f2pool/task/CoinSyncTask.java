@@ -28,15 +28,26 @@ public class CoinSyncTask {
     private IMiningCoinService miningCoinService;
 
     // CoinGecko Markets API (高级接口)
-    private static final String MARKETS_API = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=cny&ids=bitcoin,litecoin,ethereum-pow-iou,dogecoin,bitcoin-cash,ethereum-classic,kaspa,ravencoin";
+    private static final String MARKETS_API = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=cny&ids=bitcoin,litecoin,dogecoin,bitcoin-cash,ethereum-classic,kaspa,ravencoin,zcash,dash,monero,digibyte,nervos-network,flux,ergo,bitcoin-gold,ethereum-pow-iou";
 
     @PostConstruct
     public void initCoins() {
+        initCoin("BTC", "Bitcoin", "SHA256d");
+        initCoin("LTC", "Litecoin", "Scrypt");
+        initCoin("ETHW", "EthereumPoW", "Ethash");
         initCoin("DOGE", "Dogecoin", "Scrypt");
         initCoin("BCH", "Bitcoin Cash", "SHA256d");
         initCoin("ETC", "Ethereum Classic", "Etchash");
         initCoin("KAS", "Kaspa", "kHeavyHash");
         initCoin("RVN", "Ravencoin", "KawPow");
+        initCoin("ZEC", "Zcash", "Equihash");
+        initCoin("DASH", "Dash", "X11");
+        initCoin("XMR", "Monero", "RandomX");
+        initCoin("DGB", "DigiByte", "MultiAlgo");
+        initCoin("CKB", "Nervos", "Eaglesong");
+        initCoin("FLUX", "Flux", "ZelHash");
+        initCoin("ERG", "Ergo", "Autolykos");
+        initCoin("BTG", "Bitcoin Gold", "Equihash");
     }
 
     private void initCoin(String symbol, String name, String algo) {
@@ -275,6 +286,30 @@ public class CoinSyncTask {
             
             // ETHW: Network ~20 TH/s = 0.02 PH/s. Revenue ~200 ETHW/TH.
             mockCoinHashrate("ETHW", new BigDecimal("0.02"), "PH/s", 0.12, new BigDecimal("200"));
+
+            // ZEC: Network ~8.5 GH/s = 0.0000085 PH/s. Revenue ~0.012 ZEC/TH.
+            mockCoinHashrate("ZEC", new BigDecimal("0.0000085"), "PH/s", 0.12, new BigDecimal("0.012"));
+
+            // DASH: Network ~9 PH/s. Revenue ~0.00004 DASH/TH.
+            mockCoinHashrate("DASH", new BigDecimal("9"), "PH/s", 0.10, new BigDecimal("0.00004"));
+
+            // XMR: Network ~3.6 GH/s = 0.0000036 PH/s. Revenue ~0.0009 XMR/TH.
+            mockCoinHashrate("XMR", new BigDecimal("0.0000036"), "PH/s", 0.10, new BigDecimal("0.0009"));
+
+            // DGB: mixed algo, display proxy value.
+            mockCoinHashrate("DGB", new BigDecimal("0.45"), "PH/s", 0.08, new BigDecimal("2.8"));
+
+            // CKB: network ~340 PH/s. Revenue ~65 CKB/TH.
+            mockCoinHashrate("CKB", new BigDecimal("340"), "PH/s", 0.10, new BigDecimal("65"));
+
+            // FLUX: network ~6.8 MSol/s proxy, normalized as PH for UI consistency.
+            mockCoinHashrate("FLUX", new BigDecimal("0.03"), "PH/s", 0.10, new BigDecimal("0.85"));
+
+            // ERG: network ~22 TH/s = 0.022 PH/s.
+            mockCoinHashrate("ERG", new BigDecimal("0.022"), "PH/s", 0.10, new BigDecimal("1.9"));
+
+            // BTG: network ~2.1 MSol/s proxy.
+            mockCoinHashrate("BTG", new BigDecimal("0.004"), "PH/s", 0.10, new BigDecimal("0.03"));
             
         } catch (Exception e) {
             log.error("矿池算力估算失败: {}", e.getMessage());
@@ -307,6 +342,14 @@ public class CoinSyncTask {
         else if ("ethereum-classic".equals(id)) symbol = "ETC";
         else if ("kaspa".equals(id)) symbol = "KAS";
         else if ("ravencoin".equals(id)) symbol = "RVN";
+        else if ("zcash".equals(id)) symbol = "ZEC";
+        else if ("dash".equals(id)) symbol = "DASH";
+        else if ("monero".equals(id)) symbol = "XMR";
+        else if ("digibyte".equals(id)) symbol = "DGB";
+        else if ("nervos-network".equals(id)) symbol = "CKB";
+        else if ("flux".equals(id)) symbol = "FLUX";
+        else if ("ergo".equals(id)) symbol = "ERG";
+        else if ("bitcoin-gold".equals(id)) symbol = "BTG";
         else return;
 
         UpdateWrapper<MiningCoin> updateWrapper = new UpdateWrapper<>();
