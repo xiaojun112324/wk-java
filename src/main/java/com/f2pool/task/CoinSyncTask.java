@@ -124,7 +124,7 @@ public class CoinSyncTask {
             // 1 EH/s = 1000 PH/s
             BigDecimal hashRateEH = hashRateGH.divide(new BigDecimal("1000000000"), 2, RoundingMode.HALF_UP);
             BigDecimal hashRatePH = hashRateEH.multiply(new BigDecimal("1000"));
-            updateWrapper.set("network_hashrate", hashRatePH + " PH/s");
+            updateWrapper.set("network_hashrate", formatHashrate(hashRatePH, "PH"));
 
             // 2. 更新收益 (Daily Revenue Per TH/s in BTC)
             // 公式: (BlockReward * 86400) / (Difficulty * 2^32) * 10^12
@@ -176,11 +176,11 @@ public class CoinSyncTask {
             if (netHashEH != null) {
                  // 1 EH/s = 1000 PH/s
                  BigDecimal netHashPH = netHashEH.multiply(new BigDecimal("1000"));
-                 updateWrapper.set("network_hashrate", netHashPH.setScale(2, RoundingMode.HALF_UP) + " PH/s");
+                 updateWrapper.set("network_hashrate", formatHashrate(netHashPH, "PH"));
                  
                  // Pool Hashrate ~14.2% of Network
                  BigDecimal poolHashPH = netHashPH.multiply(new BigDecimal("0.142"));
-                 updateWrapper.set("pool_hashrate", poolHashPH.setScale(2, RoundingMode.HALF_UP) + " PH/s");
+                 updateWrapper.set("pool_hashrate", formatHashrate(poolHashPH, "PH"));
             }
 
             if (difficultyChange != null) {
@@ -266,50 +266,50 @@ public class CoinSyncTask {
             // Mock other coins with REALISTIC Market Data (as of 2026-03-03)
             // ALL UNITS CONVERTED TO PH/s
             
-            // LTC: Network ~3.0 PH/s. Revenue ~1.2 LTC/TH.
-            mockCoinHashrate("LTC", new BigDecimal("3.05"), "PH/s", 0.185, new BigDecimal("1.2"));
+            // LTC: Network ~3.09 PH/s. Revenue ~1.2 LTC/TH.
+            mockCoinHashrate("LTC", new BigDecimal("3.09"), "PH", 0.185, new BigDecimal("1.2"));
             
-            // DOGE: Merged with LTC. Network ~3.0 PH/s. Revenue ~4320 DOGE/TH.
-            mockCoinHashrate("DOGE", new BigDecimal("3.05"), "PH/s", 0.185, new BigDecimal("4320"));
+            // DOGE: Merged with LTC. Network ~3.08 PH/s. Revenue ~4320 DOGE/TH.
+            mockCoinHashrate("DOGE", new BigDecimal("3.08"), "PH", 0.185, new BigDecimal("4320"));
             
-            // BCH: Network ~6.0 EH/s = 6000 PH/s. Revenue ~0.000075 BCH/TH.
-            mockCoinHashrate("BCH", new BigDecimal("6040"), "PH/s", 0.05, new BigDecimal("0.000075"));
+            // BCH: Network ~5.96 EH/s. Revenue ~0.000075 BCH/TH.
+            mockCoinHashrate("BCH", new BigDecimal("5.96"), "EH", 0.05, new BigDecimal("0.000075"));
             
-            // ETC: Network ~160 TH/s = 0.16 PH/s. Revenue ~105 ETC/TH.
-            mockCoinHashrate("ETC", new BigDecimal("0.16"), "PH/s", 0.35, new BigDecimal("105"));
+            // ETC: Network ~160 TH/s. Revenue ~105 ETC/TH.
+            mockCoinHashrate("ETC", new BigDecimal("160"), "TH", 0.35, new BigDecimal("105"));
             
-            // KAS: Network ~425 PH/s. Revenue ~11.18 KAS/TH.
-            mockCoinHashrate("KAS", new BigDecimal("425"), "PH/s", 0.15, new BigDecimal("11.18"));
+            // KAS: Network ~427.04 PH/s. Revenue ~11.18 KAS/TH.
+            mockCoinHashrate("KAS", new BigDecimal("427.04"), "PH", 0.15, new BigDecimal("11.18"));
             
-            // RVN: Network ~6 TH/s = 0.006 PH/s. Revenue ~600,000 RVN/TH.
-            mockCoinHashrate("RVN", new BigDecimal("0.006"), "PH/s", 0.10, new BigDecimal("600000"));
+            // RVN: Network ~10 TH/s. Revenue ~600,000 RVN/TH.
+            mockCoinHashrate("RVN", new BigDecimal("10"), "TH", 0.10, new BigDecimal("600000"));
             
-            // ETHW: Network ~20 TH/s = 0.02 PH/s. Revenue ~200 ETHW/TH.
-            mockCoinHashrate("ETHW", new BigDecimal("0.02"), "PH/s", 0.12, new BigDecimal("200"));
+            // ETHW: Network ~20 TH/s. Revenue ~200 ETHW/TH.
+            mockCoinHashrate("ETHW", new BigDecimal("20"), "TH", 0.12, new BigDecimal("200"));
 
-            // ZEC: Network ~8.5 GH/s = 0.0000085 PH/s. Revenue ~0.012 ZEC/TH.
-            mockCoinHashrate("ZEC", new BigDecimal("0.0000085"), "PH/s", 0.12, new BigDecimal("0.012"));
+            // ZEC: Network ~8.5 GH/s. Revenue ~0.012 ZEC/TH.
+            mockCoinHashrate("ZEC", new BigDecimal("8.5"), "GH", 0.12, new BigDecimal("0.012"));
 
-            // DASH: Network ~9 PH/s. Revenue ~0.00004 DASH/TH.
-            mockCoinHashrate("DASH", new BigDecimal("9"), "PH/s", 0.10, new BigDecimal("0.00004"));
+            // DASH: Network ~9.13 PH/s. Revenue ~0.00004 DASH/TH.
+            mockCoinHashrate("DASH", new BigDecimal("9.13"), "PH", 0.10, new BigDecimal("0.00004"));
 
-            // XMR: Network ~3.6 GH/s = 0.0000036 PH/s. Revenue ~0.0009 XMR/TH.
-            mockCoinHashrate("XMR", new BigDecimal("0.0000036"), "PH/s", 0.10, new BigDecimal("0.0009"));
+            // XMR: Network ~3.6 GH/s. Revenue ~0.0009 XMR/TH.
+            mockCoinHashrate("XMR", new BigDecimal("3.6"), "GH", 0.10, new BigDecimal("0.0009"));
 
-            // DGB: mixed algo, display proxy value.
-            mockCoinHashrate("DGB", new BigDecimal("0.45"), "PH/s", 0.08, new BigDecimal("2.8"));
+            // DGB: Network ~440 TH/s.
+            mockCoinHashrate("DGB", new BigDecimal("440"), "TH", 0.08, new BigDecimal("2.8"));
 
-            // CKB: network ~340 PH/s. Revenue ~65 CKB/TH.
-            mockCoinHashrate("CKB", new BigDecimal("340"), "PH/s", 0.10, new BigDecimal("65"));
+            // CKB: network ~345.25 PH/s. Revenue ~65 CKB/TH.
+            mockCoinHashrate("CKB", new BigDecimal("345.25"), "PH", 0.10, new BigDecimal("65"));
 
-            // FLUX: network ~6.8 MSol/s proxy, normalized as PH for UI consistency.
-            mockCoinHashrate("FLUX", new BigDecimal("0.03"), "PH/s", 0.10, new BigDecimal("0.85"));
+            // FLUX: network ~30 TH/s.
+            mockCoinHashrate("FLUX", new BigDecimal("30"), "TH", 0.10, new BigDecimal("0.85"));
 
-            // ERG: network ~22 TH/s = 0.022 PH/s.
-            mockCoinHashrate("ERG", new BigDecimal("0.022"), "PH/s", 0.10, new BigDecimal("1.9"));
+            // ERG: network ~20 TH/s.
+            mockCoinHashrate("ERG", new BigDecimal("20"), "TH", 0.10, new BigDecimal("1.9"));
 
-            // BTG: network ~2.1 MSol/s proxy.
-            mockCoinHashrate("BTG", new BigDecimal("0.004"), "PH/s", 0.10, new BigDecimal("0.03"));
+            // BTG: network ~4 TH/s proxy.
+            mockCoinHashrate("BTG", new BigDecimal("4"), "TH", 0.10, new BigDecimal("0.03"));
             
         } catch (Exception e) {
             log.error("矿池算力估算失败: {}", e.getMessage());
@@ -324,10 +324,46 @@ public class CoinSyncTask {
         double factor = 0.98 + Math.random() * 0.04;
         BigDecimal finalNet = networkVal.multiply(new BigDecimal(factor)).setScale(2, RoundingMode.HALF_UP);
         
-        wrapper.set("network_hashrate", finalNet + " " + unit);
-        wrapper.set("pool_hashrate", finalNet.multiply(new BigDecimal(share)).setScale(2, RoundingMode.HALF_UP) + " " + unit);
+        wrapper.set("network_hashrate", formatHashrate(finalNet, unit));
+        wrapper.set("pool_hashrate", formatHashrate(finalNet.multiply(new BigDecimal(share)), unit));
         wrapper.set("daily_revenue_per_t", dailyRevenuePerT);
         miningCoinService.update(wrapper);
+    }
+
+    private String formatHashrate(BigDecimal value, String unit) {
+        BigDecimal hashH = toH(value, unit);
+        String[] units = {"H", "KH", "MH", "GH", "TH", "PH", "EH"};
+        int idx = 0;
+        BigDecimal thousand = new BigDecimal("1000");
+        while (hashH.abs().compareTo(thousand) >= 0 && idx < units.length - 1) {
+            hashH = hashH.divide(thousand, 8, RoundingMode.HALF_UP);
+            idx++;
+        }
+        String formatted = hashH.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
+        return formatted + " " + units[idx] + "/s";
+    }
+
+    private BigDecimal toH(BigDecimal value, String unit) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        String u = unit == null ? "H" : unit.trim().toUpperCase().replace("/S", "");
+        switch (u) {
+            case "EH":
+                return value.multiply(new BigDecimal("1000000000000000000"));
+            case "PH":
+                return value.multiply(new BigDecimal("1000000000000000"));
+            case "TH":
+                return value.multiply(new BigDecimal("1000000000000"));
+            case "GH":
+                return value.multiply(new BigDecimal("1000000000"));
+            case "MH":
+                return value.multiply(new BigDecimal("1000000"));
+            case "KH":
+                return value.multiply(new BigDecimal("1000"));
+            default:
+                return value;
+        }
     }
 
     private void updateMarketData(JSONObject data) {
