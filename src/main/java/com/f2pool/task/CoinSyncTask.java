@@ -310,6 +310,7 @@ public class CoinSyncTask {
 
         UpdateWrapper<MiningCoin> updateWrapper = new UpdateWrapper<>();
         updateWrapper.eq("symbol", symbol);
+        updateWrapper.set("logo", data.getString("image"));
         updateWrapper.set("price_cny", data.getBigDecimal("current_price"));
         updateWrapper.set("market_cap", data.getBigDecimal("market_cap"));
         updateWrapper.set("total_volume", data.getBigDecimal("total_volume"));

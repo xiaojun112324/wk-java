@@ -15,6 +15,7 @@ public class MiningCoin {
     private Long id;
     private String symbol;
     private String name;
+    private String logo;
     private String algorithm;
     private String poolHashrate;
     private String networkHashrate;

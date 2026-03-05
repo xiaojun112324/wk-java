@@ -116,6 +116,7 @@ CREATE TABLE `mining_coin` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `symbol` varchar(16) NOT NULL COMMENT '币种符号 BTC, LTC',
   `name` varchar(64) NOT NULL COMMENT '全称 Bitcoin',
+  `logo` varchar(512) DEFAULT NULL COMMENT 'coin logo url',
   `algorithm` varchar(32) NOT NULL COMMENT '算法 SHA256d',
   `pool_hashrate` varchar(32) DEFAULT '0' COMMENT '矿池算力',
   `network_hashrate` varchar(32) DEFAULT '0' COMMENT '全网算力',
