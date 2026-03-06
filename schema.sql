@@ -202,7 +202,7 @@ CREATE TABLE `mining_coin` (
   `pool_hashrate` varchar(32) DEFAULT '0' COMMENT '矿池算力',
   `network_hashrate` varchar(32) DEFAULT '0' COMMENT '全网算力',
   `price_cny` decimal(20,8) DEFAULT '0.00000000' COMMENT '人民币价格',
-  `daily_revenue_per_t` decimal(20,8) DEFAULT '0.00000000' COMMENT '每日每T收益',
+  `daily_revenue_per_p` decimal(20,8) DEFAULT '0.00000000' COMMENT '每日每P收益',
   `status` int(2) DEFAULT '1' COMMENT '状态 1上架 0下架',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_symbol` (`symbol`)
@@ -289,10 +289,10 @@ CREATE TABLE `mining_farm` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全球矿场表';
 
 -- Insert initial mock data for coins
-INSERT INTO `mining_coin` (`symbol`, `name`, `algorithm`, `pool_hashrate`, `network_hashrate`, `price_cny`, `daily_revenue_per_t`) VALUES
-('BTC', 'Bitcoin', 'SHA256d', '115.47 EH/s', '1017.05 EH/s', 454691.41, 0.20),
-('LTC', 'Litecoin', 'Scrypt', '927.28 TH/s', '2.83 PH/s', 365.92, 3.17),
-('ETHW', 'EthereumPoW', 'Ethash', '907.20 GH/s', '4.89 TH/s', 2.08, 0.0053);
+INSERT INTO `mining_coin` (`symbol`, `name`, `algorithm`, `pool_hashrate`, `network_hashrate`, `price_cny`, `daily_revenue_per_p`) VALUES
+('BTC', 'Bitcoin', 'SHA256d', '115.47 EH/s', '1017.05 EH/s', 454691.41, 200.00),
+('LTC', 'Litecoin', 'Scrypt', '927.28 TH/s', '2.83 PH/s', 365.92, 3170.00),
+('ETHW', 'EthereumPoW', 'Ethash', '907.20 GH/s', '4.89 TH/s', 2.08, 5.30);
 
 -- Insert default system config for admin registration
 INSERT INTO `sys_config` (`config_key`, `config_value`, `remark`) VALUES

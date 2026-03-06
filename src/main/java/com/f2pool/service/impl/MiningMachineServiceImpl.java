@@ -22,6 +22,7 @@ import java.util.Map;
 
 @Service
 public class MiningMachineServiceImpl extends ServiceImpl<MiningMachineMapper, MiningMachine> implements IMiningMachineService {
+    private static final BigDecimal TH_PER_PH = new BigDecimal("1000");
 
     @Autowired
     private IMiningCoinService miningCoinService;
@@ -113,13 +114,16 @@ public class MiningMachineServiceImpl extends ServiceImpl<MiningMachineMapper, M
         map.put("hashrateTH", hashrateTh);
 
         MiningCoin coin = miningCoinService.query()
-                .select("symbol", "daily_revenue_per_t", "price_cny")
+                .select("symbol", "daily_revenue_per_p", "price_cny")
                 .eq("symbol", machine.getCoinSymbol())
                 .one();
         BigDecimal dailyCoin = BigDecimal.ZERO;
         BigDecimal dailyCny = BigDecimal.ZERO;
-        if (coin != null && coin.getDailyRevenuePerT() != null) {
-            dailyCoin = hashrateTh.multiply(coin.getDailyRevenuePerT()).setScale(12, RoundingMode.HALF_UP);
+        if (coin != null && coin.getDailyRevenuePerP() != null) {
+            dailyCoin = hashrateTh
+                    .divide(TH_PER_PH, 12, RoundingMode.HALF_UP)
+                    .multiply(coin.getDailyRevenuePerP())
+                    .setScale(12, RoundingMode.HALF_UP);
             if (coin.getPriceCny() != null) {
                 dailyCny = dailyCoin.multiply(coin.getPriceCny()).setScale(8, RoundingMode.HALF_UP);
             }

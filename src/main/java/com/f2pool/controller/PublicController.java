@@ -1,5 +1,6 @@
 package com.f2pool.controller;
 
+import com.f2pool.common.ApiException;
 import com.f2pool.common.R;
 import com.f2pool.entity.MiningCoin;
 import com.f2pool.service.IMiningCoinService;
@@ -21,6 +22,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/public")
 public class PublicController {
+    private static final BigDecimal TH_PER_PH = new BigDecimal("1000");
 
     @Autowired
     private IMiningCoinService miningCoinService;
@@ -52,10 +54,16 @@ public class PublicController {
 
         MiningCoin coin = miningCoinService.query().eq("symbol", symbol).one();
         if (coin == null) {
-            throw new IllegalArgumentException("coin not found: " + symbol);
+            throw ApiException.notFound("coin not found: " + symbol);
         }
 
-        BigDecimal dailyRevenueCoin = hashrate.multiply(unitFactor).multiply(coin.getDailyRevenuePerT());
+        BigDecimal totalHashrateTh = hashrate.multiply(unitFactor);
+        BigDecimal dailyRevenueCoin = BigDecimal.ZERO;
+        if (coin.getDailyRevenuePerP() != null) {
+            dailyRevenueCoin = totalHashrateTh
+                    .divide(TH_PER_PH, 12, java.math.RoundingMode.HALF_UP)
+                    .multiply(coin.getDailyRevenuePerP());
+        }
         BigDecimal dailyRevenueCny = dailyRevenueCoin.multiply(coin.getPriceCny());
 
         Map<String, Object> result = new HashMap<>();

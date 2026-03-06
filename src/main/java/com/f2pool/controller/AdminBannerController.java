@@ -1,6 +1,7 @@
 package com.f2pool.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.f2pool.common.ApiException;
 import com.f2pool.common.R;
 import com.f2pool.dto.banner.BannerSaveRequest;
 import com.f2pool.entity.Banner;
@@ -43,7 +44,7 @@ public class AdminBannerController {
     public R<Banner> detail(@PathVariable Long id) {
         Banner banner = bannerService.getById(id);
         if (banner == null) {
-            throw new IllegalArgumentException("banner not found");
+            throw ApiException.notFound("banner not found");
         }
         return R.ok(banner);
     }

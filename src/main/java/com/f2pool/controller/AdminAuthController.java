@@ -1,5 +1,6 @@
 package com.f2pool.controller;
 
+import com.f2pool.common.ApiException;
 import com.f2pool.common.JwtTokenUtil;
 import com.f2pool.common.R;
 import com.f2pool.dto.auth.AdminLoginRequest;
@@ -52,12 +53,12 @@ public class AdminAuthController {
         Claims claims = jwtTokenUtil.parseClaims(token);
         Object uid = claims.get("uid");
         if (uid == null) {
-            throw new IllegalArgumentException("invalid token: uid missing");
+            throw ApiException.unauthorized("invalid token: uid missing");
         }
         Long userId = Long.valueOf(String.valueOf(uid));
         AdminUser user = adminUserMapper.selectById(userId);
         if (user == null) {
-            throw new IllegalArgumentException("admin user not found");
+            throw ApiException.notFound("admin user not found");
         }
         Map<String, Object> data = new HashMap<>();
         data.put("id", user.getId());

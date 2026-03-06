@@ -27,6 +27,7 @@ import java.util.Map;
 
 @Service
 public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMapper, UserMachineOrder> implements IUserMachineOrderService {
+    private static final BigDecimal TH_PER_PH = new BigDecimal("1000");
 
     @Autowired
     private IMiningMachineService miningMachineService;
@@ -57,13 +58,16 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         userWalletService.decreaseBalance(request.getUserId(), totalInvest);
 
         MiningCoin coin = miningCoinService.query()
-                .select("symbol", "daily_revenue_per_t", "price_cny")
+                .select("symbol", "daily_revenue_per_p", "price_cny")
                 .eq("symbol", machine.getCoinSymbol())
                 .one();
         BigDecimal todayRevenueCoin = BigDecimal.ZERO;
         BigDecimal todayRevenueCny = BigDecimal.ZERO;
-        if (coin != null && coin.getDailyRevenuePerT() != null) {
-            todayRevenueCoin = totalHashrateTh.multiply(coin.getDailyRevenuePerT()).setScale(12, RoundingMode.HALF_UP);
+        if (coin != null && coin.getDailyRevenuePerP() != null) {
+            todayRevenueCoin = totalHashrateTh
+                    .divide(TH_PER_PH, 12, RoundingMode.HALF_UP)
+                    .multiply(coin.getDailyRevenuePerP())
+                    .setScale(12, RoundingMode.HALF_UP);
             if (coin.getPriceCny() != null) {
                 todayRevenueCny = todayRevenueCoin.multiply(coin.getPriceCny()).setScale(8, RoundingMode.HALF_UP);
             }

@@ -1,5 +1,6 @@
 package com.f2pool.controller;
 
+import com.f2pool.common.ApiException;
 import com.f2pool.common.R;
 import com.f2pool.dto.machine.MiningMachineSaveRequest;
 import com.f2pool.entity.MiningMachine;
@@ -50,7 +51,7 @@ public class AdminMiningMachineController {
     public R<MiningMachine> detail(@PathVariable Long id) {
         MiningMachine machine = miningMachineService.getById(id);
         if (machine == null) {
-            throw new IllegalArgumentException("machine not found");
+            throw ApiException.notFound("machine not found");
         }
         return R.ok(machine);
     }

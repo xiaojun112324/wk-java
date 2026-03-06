@@ -2,6 +2,7 @@ package com.f2pool.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.f2pool.common.ApiException;
 import com.f2pool.common.JwtTokenUtil;
 import com.f2pool.dto.auth.LoginRequest;
 import com.f2pool.dto.auth.RegisterRequest;
@@ -47,12 +48,12 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
 
         long usernameExists = count(new QueryWrapper<SysUser>().eq("username", username));
         if (usernameExists > 0) {
-            throw new IllegalArgumentException("username already exists");
+            throw ApiException.conflict("username already exists");
         }
 
         long emailExists = count(new QueryWrapper<SysUser>().eq("email", email));
         if (emailExists > 0) {
-            throw new IllegalArgumentException("email already exists");
+            throw ApiException.conflict("email already exists");
         }
 
         Long inviterId = null;
@@ -101,13 +102,13 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
         );
 
         if (user == null) {
-            throw new IllegalArgumentException("user not found");
+            throw ApiException.notFound("user not found");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
-            throw new IllegalArgumentException("account is disabled");
+            throw ApiException.forbidden("account is disabled");
         }
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("password is incorrect");
+            throw ApiException.unauthorized("password is incorrect");
         }
 
         Map<String, Object> result = new HashMap<>();

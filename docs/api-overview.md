@@ -1,8 +1,12 @@
-﻿# 接口总览
+﻿# 接口总览（导航）
 
 更新时间：2026-03-06
 
-## APP 端
+## 使用方式
+- APP 端详细说明请看：`docs/app-api.md`
+- 管理端详细说明请看：`docs/admin-api.md`
+
+## APP 端模块
 
 ### 首页
 - GET /api/public/pool/stats
@@ -39,7 +43,7 @@
 - GET /api/wallet/recharge/list
 - GET /api/wallet/withdraw/list
 
-## 管理后台
+## 管理后台模块
 
 ### 认证
 - POST /api/admin/auth/register
@@ -72,3 +76,4 @@
 - GET /api/admin/config/list
 - GET /api/admin/config/{key}
 - PUT /api/admin/config/{key}
+

@@ -2,6 +2,7 @@ package com.f2pool.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.f2pool.common.ApiException;
 import com.f2pool.common.JwtTokenUtil;
 import com.f2pool.dto.auth.AdminLoginRequest;
 import com.f2pool.dto.auth.AdminRegisterRequest;
@@ -53,7 +54,7 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
 
         String expectedInviteCode = getAdminRegisterInviteCode();
         if (!expectedInviteCode.equals(request.getRegisterInviteCode().trim())) {
-            throw new IllegalArgumentException("register invite code is incorrect");
+            throw ApiException.forbidden("register invite code is incorrect");
         }
 
         String username = request.getUsername().trim();
@@ -61,12 +62,12 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
 
         long usernameExists = count(new QueryWrapper<AdminUser>().eq("username", username));
         if (usernameExists > 0) {
-            throw new IllegalArgumentException("username already exists");
+            throw ApiException.conflict("username already exists");
         }
 
         long emailExists = count(new QueryWrapper<AdminUser>().eq("email", email));
         if (emailExists > 0) {
-            throw new IllegalArgumentException("email already exists");
+            throw ApiException.conflict("email already exists");
         }
 
         AdminUser user = new AdminUser();
@@ -103,13 +104,13 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
         );
 
         if (user == null) {
-            throw new IllegalArgumentException("admin user not found");
+            throw ApiException.notFound("admin user not found");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
-            throw new IllegalArgumentException("admin account is disabled");
+            throw ApiException.forbidden("admin account is disabled");
         }
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("password is incorrect");
+            throw ApiException.unauthorized("password is incorrect");
         }
 
         Map<String, Object> result = new HashMap<>();

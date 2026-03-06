@@ -1,5 +1,6 @@
 package com.f2pool.controller;
 
+import com.f2pool.common.ApiException;
 import com.f2pool.common.R;
 import com.f2pool.common.TokenContextUtil;
 import com.f2pool.dto.machine.UserMachineOrderActionRequest;
@@ -52,7 +53,7 @@ public class UserMachineOrderController {
         Map<String, Object> order = userMachineOrderService.detail(id);
         Object owner = order.get("userId");
         if (owner == null || !String.valueOf(userId).equals(String.valueOf(owner))) {
-            throw new IllegalArgumentException("order does not belong to this user");
+            throw ApiException.forbidden("order does not belong to this user");
         }
         return R.ok(order);
     }

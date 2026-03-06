@@ -18,6 +18,7 @@ import java.util.*;
 
 @Service
 public class MiningWorkerServiceImpl extends ServiceImpl<MiningWorkerMapper, MiningWorker> implements IMiningWorkerService {
+    private static final BigDecimal TH_PER_PH = new BigDecimal("1000");
 
     @Autowired
     private IMiningCoinService miningCoinService;
@@ -42,8 +43,10 @@ public class MiningWorkerServiceImpl extends ServiceImpl<MiningWorkerMapper, Min
         
         // Calculate Revenue based on REAL Network Data
         MiningCoin btc = miningCoinService.query().eq("symbol", "BTC").one();
-        if (btc != null && btc.getDailyRevenuePerT() != null) {
-             BigDecimal dailyRevenue = btc.getDailyRevenuePerT().multiply(simulatedHashrate);
+        if (btc != null && btc.getDailyRevenuePerP() != null) {
+             BigDecimal dailyRevenue = simulatedHashrate
+                     .divide(TH_PER_PH, 12, RoundingMode.HALF_UP)
+                     .multiply(btc.getDailyRevenuePerP());
              stats.put("yesterdayRevenue", dailyRevenue.setScale(8, RoundingMode.HALF_UP) + " BTC");
              
              // New Stats for Revenue Page
@@ -105,11 +108,14 @@ public class MiningWorkerServiceImpl extends ServiceImpl<MiningWorkerMapper, Min
         BigDecimal avgHashrate24h = totalHashrate24h;
 
         MiningCoin btc = miningCoinService.query().eq("symbol", "BTC").one();
-        BigDecimal dailyRevenuePerT = (btc == null || btc.getDailyRevenuePerT() == null)
+        BigDecimal dailyRevenuePerP = (btc == null || btc.getDailyRevenuePerP() == null)
                 ? BigDecimal.ZERO
-                : btc.getDailyRevenuePerT();
+                : btc.getDailyRevenuePerP();
 
-        BigDecimal yesterdayRevenueCoin = totalHashrate24h.multiply(dailyRevenuePerT).setScale(8, RoundingMode.HALF_UP);
+        BigDecimal yesterdayRevenueCoin = totalHashrate24h
+                .divide(TH_PER_PH, 12, RoundingMode.HALF_UP)
+                .multiply(dailyRevenuePerP)
+                .setScale(8, RoundingMode.HALF_UP);
         BigDecimal todayMinedCoin = yesterdayRevenueCoin.multiply(new BigDecimal("0.60")).setScale(8, RoundingMode.HALF_UP);
 
         BigDecimal totalRevenueCoin = sumTotalRevenueCoinByUser(userId);
