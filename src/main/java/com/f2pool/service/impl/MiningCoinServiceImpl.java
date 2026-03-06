@@ -165,15 +165,34 @@ public class MiningCoinServiceImpl extends ServiceImpl<MiningCoinMapper, MiningC
         if (row == null) {
             return;
         }
-        coin.setLogo(row.getString("logo"));
-        coin.setPriceCny(row.getBigDecimal("priceCny"));
-        coin.setMarketCap(row.getBigDecimal("marketCap"));
-        coin.setTotalVolume(row.getBigDecimal("totalVolume"));
-        coin.setPriceChange24h(row.getBigDecimal("priceChange24h"));
-        coin.setCirculatingSupply(row.getBigDecimal("circulatingSupply"));
-        coin.setTotalSupply(row.getBigDecimal("totalSupply"));
-        coin.setHigh24h(row.getBigDecimal("high24h"));
-        coin.setLow24h(row.getBigDecimal("low24h"));
+        String logo = row.getString("logo");
+        if (logo != null && !logo.isBlank()) {
+            coin.setLogo(logo);
+        }
+        if (row.containsKey("priceCny") && row.getBigDecimal("priceCny") != null) {
+            coin.setPriceCny(row.getBigDecimal("priceCny"));
+        }
+        if (row.containsKey("marketCap") && row.getBigDecimal("marketCap") != null) {
+            coin.setMarketCap(row.getBigDecimal("marketCap"));
+        }
+        if (row.containsKey("totalVolume") && row.getBigDecimal("totalVolume") != null) {
+            coin.setTotalVolume(row.getBigDecimal("totalVolume"));
+        }
+        if (row.containsKey("priceChange24h") && row.getBigDecimal("priceChange24h") != null) {
+            coin.setPriceChange24h(row.getBigDecimal("priceChange24h"));
+        }
+        if (row.containsKey("circulatingSupply") && row.getBigDecimal("circulatingSupply") != null) {
+            coin.setCirculatingSupply(row.getBigDecimal("circulatingSupply"));
+        }
+        if (row.containsKey("totalSupply") && row.getBigDecimal("totalSupply") != null) {
+            coin.setTotalSupply(row.getBigDecimal("totalSupply"));
+        }
+        if (row.containsKey("high24h") && row.getBigDecimal("high24h") != null) {
+            coin.setHigh24h(row.getBigDecimal("high24h"));
+        }
+        if (row.containsKey("low24h") && row.getBigDecimal("low24h") != null) {
+            coin.setLow24h(row.getBigDecimal("low24h"));
+        }
     }
 
     private void addPool(List<Map<String, Object>> list, String name, BigDecimal totalHash, double share, String icon) {

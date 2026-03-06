@@ -159,7 +159,7 @@
 ### 1.9 币价走势
 - Method: `GET`
 - Path: `/api/public/coin/chart`
-- 数据源：外部真实币价数据源（CoinGecko），仅日线（`interval=daily`）
+- 数据源：外部真实币价数据源（OKX），仅日线（`1D` K线）
 - 读取策略：接口只读 Redis 走势缓存（后台每 1 小时刷新一次）
 - Query:
   - `id`（可选，币种ID）

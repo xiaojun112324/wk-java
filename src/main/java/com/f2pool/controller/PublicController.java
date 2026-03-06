@@ -81,7 +81,7 @@ public class PublicController {
             @ApiParam(value = "Hashrate value", required = true, example = "100") @RequestParam BigDecimal hashrate,
             @ApiParam(value = "Hashrate unit factor (1=TH, 1000=PH)", defaultValue = "1") @RequestParam(defaultValue = "1") BigDecimal unitFactor) {
 
-        MiningCoin coin = miningCoinService.query().eq("symbol", symbol).one();
+        MiningCoin coin = miningCoinService.getCoinDetail(null, symbol);
         if (coin == null) {
             throw ApiException.notFound("coin not found: " + symbol);
         }
