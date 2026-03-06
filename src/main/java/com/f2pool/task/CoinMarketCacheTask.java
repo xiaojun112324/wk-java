@@ -28,6 +28,10 @@ public class CoinMarketCacheTask {
 
     private static final String CACHE_MARKET_KEY = "f2pool:cache:coin:market";
     private static final String CACHE_TREND_KEY_PREFIX = "f2pool:cache:coin:trend:";
+    private static final String CACHE_USD_CNY_KEY = "f2pool:cache:fx:usd_cny";
+    private static final BigDecimal MIN_USD_CNY = new BigDecimal("5");
+    private static final BigDecimal MAX_USD_CNY = new BigDecimal("10");
+    private static final BigDecimal PRICE_JUMP_LIMIT = new BigDecimal("0.20");
 
     private static final int[] TREND_DAYS = {7, 30, 180, 365};
 
@@ -72,6 +76,16 @@ public class CoinMarketCacheTask {
             BigDecimal usdCny = getUsdCnyRate();
             JSONObject marketBySymbol = fetchOkxMarket(usdCny);
             if (!marketBySymbol.isEmpty()) {
+                JSONObject prev = null;
+                String prevJson = stringRedisTemplate.opsForValue().get(CACHE_MARKET_KEY);
+                if (prevJson != null && !prevJson.isBlank()) {
+                    try {
+                        prev = JSON.parseObject(prevJson);
+                    } catch (Exception ignored) {
+                    }
+                }
+                marketBySymbol = sanitizeMarketSnapshot(marketBySymbol, prev);
+                marketBySymbol = mergeWithPreviousSnapshot(marketBySymbol, prev);
                 // Keep last successful snapshot; do not set TTL to avoid sudden empty data.
                 stringRedisTemplate.opsForValue().set(CACHE_MARKET_KEY, marketBySymbol.toJSONString());
             }
@@ -180,14 +194,69 @@ public class CoinMarketCacheTask {
                 if (data != null && !data.isEmpty()) {
                     JSONObject row = data.getJSONObject(0);
                     BigDecimal usdCny = row.getBigDecimal("usdCny");
-                    if (usdCny != null && usdCny.compareTo(BigDecimal.ZERO) > 0) {
+                    if (isValidUsdCny(usdCny)) {
+                        stringRedisTemplate.opsForValue().set(CACHE_USD_CNY_KEY, usdCny.toPlainString());
                         return usdCny;
                     }
                 }
             }
         } catch (Exception ignored) {
         }
+        try {
+            String cached = stringRedisTemplate.opsForValue().get(CACHE_USD_CNY_KEY);
+            if (cached != null && !cached.isBlank()) {
+                BigDecimal cachedRate = new BigDecimal(cached);
+                if (isValidUsdCny(cachedRate)) {
+                    return cachedRate;
+                }
+            }
+        } catch (Exception ignored) {
+        }
         return new BigDecimal("7.2");
+    }
+
+    private boolean isValidUsdCny(BigDecimal rate) {
+        return rate != null && rate.compareTo(MIN_USD_CNY) >= 0 && rate.compareTo(MAX_USD_CNY) <= 0;
+    }
+
+    private JSONObject sanitizeMarketSnapshot(JSONObject current, JSONObject previous) {
+        if (current == null || current.isEmpty() || previous == null || previous.isEmpty()) {
+            return current;
+        }
+        for (String symbol : current.keySet()) {
+            JSONObject cur = current.getJSONObject(symbol);
+            JSONObject prev = previous.getJSONObject(symbol);
+            if (cur == null || prev == null) {
+                continue;
+            }
+            BigDecimal curPrice = cur.getBigDecimal("priceCny");
+            BigDecimal prevPrice = prev.getBigDecimal("priceCny");
+            if (curPrice == null || prevPrice == null || prevPrice.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            BigDecimal changeAbs = curPrice.subtract(prevPrice).abs();
+            BigDecimal changeRatio = changeAbs.divide(prevPrice, 8, RoundingMode.HALF_UP);
+            if (changeRatio.compareTo(PRICE_JUMP_LIMIT) > 0) {
+                // Outlier protection: keep previous snapshot for this symbol.
+                current.put(symbol, prev);
+            }
+        }
+        return current;
+    }
+
+    private JSONObject mergeWithPreviousSnapshot(JSONObject current, JSONObject previous) {
+        if (current == null) {
+            return previous == null ? new JSONObject() : previous;
+        }
+        if (previous == null || previous.isEmpty()) {
+            return current;
+        }
+        for (String symbol : previous.keySet()) {
+            if (!current.containsKey(symbol)) {
+                current.put(symbol, previous.get(symbol));
+            }
+        }
+        return current;
     }
 
     private List<JSONArray> fetchHistoryCandles(String instId, int days) {
