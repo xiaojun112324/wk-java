@@ -2,6 +2,7 @@ package com.f2pool.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.f2pool.common.JwtTokenUtil;
 import com.f2pool.dto.auth.AdminLoginRequest;
 import com.f2pool.dto.auth.AdminRegisterRequest;
 import com.f2pool.entity.AdminUser;
@@ -16,7 +17,6 @@ import org.springframework.util.StringUtils;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser> implements IAdminAuthService {
@@ -27,6 +27,8 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
 
     @Autowired
     private SysConfigMapper sysConfigMapper;
+    @Autowired
+    private JwtTokenUtil jwtTokenUtil;
 
     @Override
     public Map<String, Object> register(AdminRegisterRequest request) {
@@ -75,7 +77,9 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
         save(user);
 
         Map<String, Object> result = new HashMap<>();
-        result.put("token", UUID.randomUUID().toString().replace("-", ""));
+        result.put("token", jwtTokenUtil.generateToken(user.getId(), user.getUsername(), "ADMIN"));
+        result.put("tokenType", "Bearer");
+        result.put("expiresIn", jwtTokenUtil.getExpireSeconds());
         result.put("user", buildUserInfo(user));
         return result;
     }
@@ -109,7 +113,9 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
         }
 
         Map<String, Object> result = new HashMap<>();
-        result.put("token", UUID.randomUUID().toString().replace("-", ""));
+        result.put("token", jwtTokenUtil.generateToken(user.getId(), user.getUsername(), "ADMIN"));
+        result.put("tokenType", "Bearer");
+        result.put("expiresIn", jwtTokenUtil.getExpireSeconds());
         result.put("user", buildUserInfo(user));
         return result;
     }

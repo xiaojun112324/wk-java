@@ -1,5 +1,6 @@
 server:
-  port: 8080
+  port: 8888
+  address: 127.0.0.1
 
 spring:
   application:
@@ -9,11 +10,12 @@ spring:
     url: jdbc:mysql://121.127.231.209:3306/wk-mysql?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
     username: wk-mysql
     password: 8P44njJ3WckjxiW7
-  redis:
-    host: 121.127.231.209
-    port: 6379
-    password: EWdeXZ2SkT73bdQQnW64
-    database: 5
+  data:
+    redis:
+      host: 121.127.231.209
+      port: 6379
+      password: EWdeXZ2SkT73bdQQnW64
+      database: 5
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
@@ -21,11 +23,23 @@ spring:
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
     map-underscore-to-camel-case: true
 
-# Swagger config
-springfox:
-  documentation:
-    swagger-ui:
-      enabled: true
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+
+jwt:
+  secret: ${JWT_SECRET:change-this-to-a-very-long-random-secret-key-please-1234567890}
+  expire-seconds: ${JWT_EXPIRE_SECONDS:604800}
+
+logging:
+  level:
+    org.mybatis: WARN
+    com.baomidou: WARN
+    org.apache.coyote.http11.Http11Processor: ERROR

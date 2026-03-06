@@ -2,11 +2,13 @@ package com.f2pool.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.f2pool.common.JwtTokenUtil;
 import com.f2pool.dto.auth.LoginRequest;
 import com.f2pool.dto.auth.RegisterRequest;
 import com.f2pool.entity.SysUser;
 import com.f2pool.mapper.SysUserMapper;
 import com.f2pool.service.IUserAuthService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -19,6 +21,8 @@ import java.util.UUID;
 public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements IUserAuthService {
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    @Autowired
+    private JwtTokenUtil jwtTokenUtil;
 
     @Override
     public Map<String, Object> register(RegisterRequest request) {
@@ -70,7 +74,9 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
         save(user);
 
         Map<String, Object> result = new HashMap<>();
-        result.put("token", UUID.randomUUID().toString().replace("-", ""));
+        result.put("token", jwtTokenUtil.generateToken(user.getId(), user.getUsername(), "USER"));
+        result.put("tokenType", "Bearer");
+        result.put("expiresIn", jwtTokenUtil.getExpireSeconds());
         result.put("user", buildUserInfo(user));
         return result;
     }
@@ -105,7 +111,9 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
         }
 
         Map<String, Object> result = new HashMap<>();
-        result.put("token", UUID.randomUUID().toString().replace("-", ""));
+        result.put("token", jwtTokenUtil.generateToken(user.getId(), user.getUsername(), "USER"));
+        result.put("tokenType", "Bearer");
+        result.put("expiresIn", jwtTokenUtil.getExpireSeconds());
         result.put("user", buildUserInfo(user));
         return result;
     }

@@ -1,12 +1,12 @@
-# 认证接口文档（前端联调）
+# 认证接口文档
 
-更新时间：2026-03-05
+更新时间：2026-03-06
 
-## 1. 通用说明
+## 通用说明
 
-- Base URL: `http://{host}:8080`
+- Base URL: `https://api.kuaiyi.info`
 - Content-Type: `application/json`
-- 统一响应格式：
+- 统一返回：
 
 ```json
 {
@@ -16,35 +16,28 @@
 }
 ```
 
-失败示例：
+## JWT 说明
 
-```json
-{
-  "code": 500,
-  "msg": "username already exists",
-  "data": null
-}
+- 登录/注册成功后，`data.token` 返回 JWT。
+- 同时返回：
+  - `tokenType`: `Bearer`
+  - `expiresIn`: 过期秒数（默认 `604800`，即 7 天）
+- 业务接口调用时，HTTP Header 使用：
+
+```http
+Authorization: Bearer <token>
 ```
 
 ---
 
-## 2. 普通用户认证（`user` 表）
+## 用户认证（`user`）
 
-### 2.1 用户注册
+### 1) 注册
 
-- 路径：`POST /api/auth/register`
-- 说明：使用账号/邮箱/密码注册，可选填写上级邀请码（用户邀请码）
+- Method: `POST`
+- Path: `/api/auth/register`
 
-请求参数：
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| username | string | 是 | 登录账号（唯一） |
-| email | string | 是 | 邮箱（唯一） |
-| password | string | 是 | 密码，至少 6 位 |
-| inviteCode | string | 否 | 上级用户的邀请码 |
-
-请求示例：
+请求体：
 
 ```json
 {
@@ -55,14 +48,16 @@
 }
 ```
 
-成功响应示例：
+成功响应：
 
 ```json
 {
   "code": 200,
   "msg": "success",
   "data": {
-    "token": "6bdf0ad69e2d4cc5a7e8d9f62f5f294b",
+    "token": "eyJhbGciOiJIUzI1NiJ9.xxx.yyy",
+    "tokenType": "Bearer",
+    "expiresIn": 604800,
     "user": {
       "id": 1,
       "username": "alice",
@@ -75,29 +70,12 @@
 }
 ```
 
-常见错误：
+### 2) 登录
 
-- `username is required`
-- `email is required`
-- `password is required`
-- `password must be at least 6 characters`
-- `username already exists`
-- `email already exists`
-- `invite code not found`
+- Method: `POST`
+- Path: `/api/auth/login`
 
-### 2.2 用户登录
-
-- 路径：`POST /api/auth/login`
-- 说明：支持“账号或邮箱 + 密码”
-
-请求参数：
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| account | string | 是 | 可传 `username` 或 `email` |
-| password | string | 是 | 登录密码 |
-
-请求示例：
+请求体：
 
 ```json
 {
@@ -106,34 +84,16 @@
 }
 ```
 
-常见错误：
-
-- `account is required`
-- `password is required`
-- `user not found`
-- `password is incorrect`
-- `account is disabled`
-
 ---
 
-## 3. 管理后台认证（`sys_user` 表）
+## 管理员认证（`sys_user`）
 
-### 3.1 管理员注册
+### 1) 注册
 
-- 路径：`POST /api/admin/auth/register`
-- 说明：管理员注册必须提供系统邀请码
-- 邀请码来源：`sys_config` 表中 `config_key = admin_register_invite_code` 的 `config_value`
+- Method: `POST`
+- Path: `/api/admin/auth/register`
 
-请求参数：
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| username | string | 是 | 管理员账号（唯一） |
-| email | string | 是 | 管理员邮箱（唯一） |
-| password | string | 是 | 密码，至少 6 位 |
-| registerInviteCode | string | 是 | 管理员注册邀请码（来自系统配置） |
-
-请求示例：
+请求体：
 
 ```json
 {
@@ -144,45 +104,12 @@
 }
 ```
 
-成功响应示例：
+### 2) 登录
 
-```json
-{
-  "code": 200,
-  "msg": "success",
-  "data": {
-    "token": "95df6d1c0ca14d13b6d14552a2a61df1",
-    "user": {
-      "id": 1,
-      "username": "admin01",
-      "email": "admin01@example.com",
-      "status": 1
-    }
-  }
-}
-```
+- Method: `POST`
+- Path: `/api/admin/auth/login`
 
-常见错误：
-
-- `registerInviteCode is required`
-- `admin register invite code is not configured`
-- `register invite code is incorrect`
-- `username already exists`
-- `email already exists`
-
-### 3.2 管理员登录
-
-- 路径：`POST /api/admin/auth/login`
-- 说明：支持“账号或邮箱 + 密码”
-
-请求参数：
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| account | string | 是 | 可传 `username` 或 `email` |
-| password | string | 是 | 登录密码 |
-
-请求示例：
+请求体：
 
 ```json
 {
@@ -190,24 +117,3 @@
   "password": "123456"
 }
 ```
-
-常见错误：
-
-- `account is required`
-- `password is required`
-- `admin user not found`
-- `password is incorrect`
-- `admin account is disabled`
-
----
-
-## 4. 系统配置说明（`sys_config`）
-
-已增加默认配置：
-
-```sql
-config_key = 'admin_register_invite_code'
-config_value = 'ADMIN2026'
-```
-
-生产环境建议在初始化后立刻改成你自己的邀请码。
