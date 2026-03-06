@@ -52,7 +52,7 @@ public class PublicController {
 
         MiningCoin coin = miningCoinService.query().eq("symbol", symbol).one();
         if (coin == null) {
-            return R.fail("Coin not found: " + symbol);
+            throw new IllegalArgumentException("coin not found: " + symbol);
         }
 
         BigDecimal dailyRevenueCoin = hashrate.multiply(unitFactor).multiply(coin.getDailyRevenuePerT());
