@@ -247,6 +247,16 @@ public class UserWalletServiceImpl implements IUserWalletService {
                 .map(InviteRebateOrder::getRebateAmountCny)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal level1RebateTotalCny = rebateOrders.stream()
+                .filter(x -> x.getLevel() != null && x.getLevel() == 1)
+                .map(InviteRebateOrder::getRebateAmountCny)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal level2RebateTotalCny = rebateOrders.stream()
+                .filter(x -> x.getLevel() != null && x.getLevel() == 2)
+                .map(InviteRebateOrder::getRebateAmountCny)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalSourceRechargeCny = rebateOrders.stream()
                 .map(InviteRebateOrder::getSourceRechargeAmountCny)
                 .filter(Objects::nonNull)
@@ -260,6 +270,8 @@ public class UserWalletServiceImpl implements IUserWalletService {
         map.put("level1Rate", getConfigDecimal(LEVEL1_RATE_KEY, BigDecimal.ZERO));
         map.put("level2Rate", getConfigDecimal(LEVEL2_RATE_KEY, BigDecimal.ZERO));
         map.put("totalRebateCny", totalRebateCny);
+        map.put("level1RebateTotalCny", level1RebateTotalCny);
+        map.put("level2RebateTotalCny", level2RebateTotalCny);
         map.put("totalSourceRechargeCny", totalSourceRechargeCny);
         return map;
     }

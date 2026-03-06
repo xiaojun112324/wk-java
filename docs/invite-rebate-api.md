@@ -71,6 +71,8 @@
 - `level1Rate`：一级返利比例
 - `level2Rate`：二级返利比例
 - `totalRebateCny`：总返利收益
+- `level1RebateTotalCny`：一级返利累计收益
+- `level2RebateTotalCny`：二级返利累计收益
 - `totalSourceRechargeCny`：返利来源总充值金额
 
 ### 6.2 两级邀请关系
