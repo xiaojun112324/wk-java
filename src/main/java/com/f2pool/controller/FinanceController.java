@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Api(tags = "Finance APIs")
+@Api(tags = "财务接口")
 @RestController
 @RequestMapping("/api/finance")
 public class FinanceController {
@@ -19,13 +19,13 @@ public class FinanceController {
     @Autowired
     private IFinanceService financeService;
 
-    @ApiOperation("Get User Account (Balance, Total Revenue)")
+    @ApiOperation("获取用户账户（余额/累计收益）")
     @GetMapping("/account")
     public R<FinanceAccount> getAccount(@RequestParam Long userId, @RequestParam String coin) {
         return R.ok(financeService.getUserAccount(userId, coin));
     }
 
-    @ApiOperation("Get Bill History (Revenue/Payout)")
+    @ApiOperation("获取账单历史（收益/支出）")
     @GetMapping("/bill/list")
     public R<List<FinanceBill>> getBillList(@RequestParam Long userId, 
                                             @RequestParam String coin, 

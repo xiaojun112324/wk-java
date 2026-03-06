@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Api(tags = "Admin Banner APIs")
+@Api(tags = "管理端轮播图接口")
 @RestController
 @RequestMapping("/api/admin/banner")
 public class AdminBannerController {
@@ -20,25 +20,25 @@ public class AdminBannerController {
     @Autowired
     private IBannerService bannerService;
 
-    @ApiOperation("Create banner")
+    @ApiOperation("新增轮播图")
     @PostMapping
     public R<Banner> create(@RequestBody BannerSaveRequest request) {
         return R.ok(bannerService.create(request));
     }
 
-    @ApiOperation("Update banner")
+    @ApiOperation("修改轮播图")
     @PutMapping("/{id}")
     public R<Banner> update(@PathVariable Long id, @RequestBody BannerSaveRequest request) {
         return R.ok(bannerService.update(id, request));
     }
 
-    @ApiOperation("Delete banner")
+    @ApiOperation("删除轮播图")
     @DeleteMapping("/{id}")
     public R<Boolean> delete(@PathVariable Long id) {
         return R.ok(bannerService.removeById(id));
     }
 
-    @ApiOperation("Get banner detail")
+    @ApiOperation("轮播图详情")
     @GetMapping("/{id}")
     public R<Banner> detail(@PathVariable Long id) {
         Banner banner = bannerService.getById(id);
@@ -48,7 +48,7 @@ public class AdminBannerController {
         return R.ok(banner);
     }
 
-    @ApiOperation("Get banner list")
+    @ApiOperation("轮播图列表")
     @GetMapping("/list")
     public R<List<Banner>> list() {
         List<Banner> list = bannerService.list(new QueryWrapper<Banner>().orderByDesc("id"));

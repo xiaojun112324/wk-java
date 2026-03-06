@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-@Api(tags = "Auth APIs")
+@Api(tags = "用户认证接口")
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -22,13 +22,13 @@ public class AuthController {
     @Autowired
     private IUserAuthService userAuthService;
 
-    @ApiOperation("Register by username/email/password, optional inviter inviteCode")
+    @ApiOperation("用户注册（账号/邮箱/密码，可选邀请码）")
     @PostMapping("/register")
     public R<Map<String, Object>> register(@RequestBody RegisterRequest request) {
         return R.ok(userAuthService.register(request));
     }
 
-    @ApiOperation("Login by username or email + password")
+    @ApiOperation("用户登录（账号或邮箱+密码）")
     @PostMapping("/login")
     public R<Map<String, Object>> login(@RequestBody LoginRequest request) {
         return R.ok(userAuthService.login(request));

@@ -19,14 +19,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-@Api(tags = "Admin File APIs")
+@Api(tags = "管理端文件接口")
 @RestController
 @RequestMapping("/api/admin/file")
 public class AdminFileController {
 
     private static final String UPLOAD_DIR = "/www/wwwroot/upload";
 
-    @ApiOperation("Upload file to /www/wwwroot/upload")
+    @ApiOperation("上传文件到 /www/wwwroot/upload")
     @PostMapping("/upload")
     public R<Map<String, Object>> upload(@RequestParam("file") MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {

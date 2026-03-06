@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-@Api(tags = "User Dashboard APIs")
+@Api(tags = "用户看板接口")
 @RestController
 @RequestMapping("/api/dashboard")
 public class DashboardController {
@@ -18,13 +18,13 @@ public class DashboardController {
     @Autowired
     private IMiningWorkerService miningWorkerService;
 
-    @ApiOperation("Get Worker Status (Online/Offline)")
+    @ApiOperation("获取矿工状态（在线/离线）")
     @GetMapping("/worker/stats")
     public R<Map<String, Object>> getWorkerStats(@RequestParam Long userId) {
         return R.ok(miningWorkerService.getWorkerStats(userId));
     }
 
-    @ApiOperation("Get Hashrate Chart")
+    @ApiOperation("获取算力图表")
     @GetMapping("/hashrate/chart")
     public R<List<Map<String, Object>>> getHashrateChart(@RequestParam Long userId, 
                                                          @RequestParam(defaultValue = "24h") String timeRange) {

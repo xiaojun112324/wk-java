@@ -17,7 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@Api(tags = "Public Data APIs")
+@Api(tags = "公共数据接口")
 @RestController
 @RequestMapping("/api/public")
 public class PublicController {
@@ -25,25 +25,25 @@ public class PublicController {
     @Autowired
     private IMiningCoinService miningCoinService;
 
-    @ApiOperation("Get pool stats")
+    @ApiOperation("获取矿池统计")
     @GetMapping("/pool/stats")
     public R<List<MiningCoin>> getPoolStats() {
         return R.ok(miningCoinService.getPoolStats());
     }
 
-    @ApiOperation("Get PoW revenue rankings")
+    @ApiOperation("获取 PoW 收益排行")
     @GetMapping("/rank/pow")
     public R<List<MiningCoin>> getPowRankings() {
         return R.ok(miningCoinService.getPowRankings());
     }
 
-    @ApiOperation("Get pool rankings")
+    @ApiOperation("获取矿池排行")
     @GetMapping("/pool/rankings")
     public R<List<Map<String, Object>>> getPoolRankings() {
         return R.ok(miningCoinService.getRealPoolRankings());
     }
 
-    @ApiOperation("Mining revenue calculator")
+    @ApiOperation("挖矿收益计算器")
     @GetMapping("/tool/calculator")
     public R<Map<String, Object>> calculate(
             @ApiParam(value = "Coin symbol", required = true, example = "BTC") @RequestParam String symbol,

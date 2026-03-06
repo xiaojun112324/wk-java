@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-@Api(tags = "Admin Auth APIs")
+@Api(tags = "管理端认证接口")
 @RestController
 @RequestMapping("/api/admin/auth")
 public class AdminAuthController {
@@ -22,13 +22,13 @@ public class AdminAuthController {
     @Autowired
     private IAdminAuthService adminAuthService;
 
-    @ApiOperation("Admin register by username/email/password + registerInviteCode(from sys_config)")
+    @ApiOperation("管理员注册（账号/邮箱/密码/系统邀请码）")
     @PostMapping("/register")
     public R<Map<String, Object>> register(@RequestBody AdminRegisterRequest request) {
         return R.ok(adminAuthService.register(request));
     }
 
-    @ApiOperation("Admin login by username or email + password")
+    @ApiOperation("管理员登录（账号或邮箱+密码）")
     @PostMapping("/login")
     public R<Map<String, Object>> login(@RequestBody AdminLoginRequest request) {
         return R.ok(adminAuthService.login(request));

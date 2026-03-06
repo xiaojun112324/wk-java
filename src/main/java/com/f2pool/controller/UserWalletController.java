@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-@Api(tags = "User Wallet APIs")
+@Api(tags = "用户钱包接口")
 @RestController
 @RequestMapping("/api/wallet")
 public class UserWalletController {
@@ -20,37 +20,37 @@ public class UserWalletController {
     @Autowired
     private IUserWalletService userWalletService;
 
-    @ApiOperation("Get wallet account")
+    @ApiOperation("获取钱包账户")
     @GetMapping("/account")
     public R<Map<String, Object>> account(@RequestParam Long userId) {
         return R.ok(userWalletService.getWallet(userId));
     }
 
-    @ApiOperation("Get recharge addresses from sys_config")
+    @ApiOperation("获取充值地址（来自系统配置）")
     @GetMapping("/recharge/address")
     public R<Map<String, Object>> rechargeAddress() {
         return R.ok(userWalletService.getRechargeAddressConfig());
     }
 
-    @ApiOperation("Submit recharge ticket with voucher image")
+    @ApiOperation("提交充值工单（含凭证图片）")
     @PostMapping("/recharge/submit")
     public R<Map<String, Object>> submitRecharge(@RequestBody RechargeSubmitRequest request) {
         return R.ok(userWalletService.submitRecharge(request));
     }
 
-    @ApiOperation("Submit withdraw ticket")
+    @ApiOperation("提交提现工单")
     @PostMapping("/withdraw/submit")
     public R<Map<String, Object>> submitWithdraw(@RequestBody WithdrawSubmitRequest request) {
         return R.ok(userWalletService.submitWithdraw(request));
     }
 
-    @ApiOperation("Recharge tickets by user")
+    @ApiOperation("用户充值工单列表")
     @GetMapping("/recharge/list")
     public R<List<Map<String, Object>>> rechargeList(@RequestParam Long userId) {
         return R.ok(userWalletService.listRechargeByUser(userId));
     }
 
-    @ApiOperation("Withdraw tickets by user")
+    @ApiOperation("用户提现工单列表")
     @GetMapping("/withdraw/list")
     public R<List<Map<String, Object>>> withdrawList(@RequestParam Long userId) {
         return R.ok(userWalletService.listWithdrawByUser(userId));

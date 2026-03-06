@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-@Api(tags = "User Machine Order APIs")
+@Api(tags = "用户矿机订单接口")
 @RestController
 @RequestMapping("/api/order/machine")
 public class UserMachineOrderController {
@@ -20,31 +20,31 @@ public class UserMachineOrderController {
     @Autowired
     private IUserMachineOrderService userMachineOrderService;
 
-    @ApiOperation("Create user machine order")
+    @ApiOperation("创建矿机订单")
     @PostMapping
     public R<Map<String, Object>> create(@RequestBody UserMachineOrderCreateRequest request) {
         return R.ok(userMachineOrderService.createOrder(request));
     }
 
-    @ApiOperation("List user machine orders")
+    @ApiOperation("矿机订单列表")
     @GetMapping("/list")
     public R<List<Map<String, Object>>> list(@RequestParam Long userId) {
         return R.ok(userMachineOrderService.listByUserId(userId));
     }
 
-    @ApiOperation("Machine order detail")
+    @ApiOperation("矿机订单详情")
     @GetMapping("/{id}")
     public R<Map<String, Object>> detail(@PathVariable Long id) {
         return R.ok(userMachineOrderService.detail(id));
     }
 
-    @ApiOperation("Sell machine order after lock period")
+    @ApiOperation("锁仓期后卖出矿机订单")
     @PostMapping("/{id}/sell")
     public R<Map<String, Object>> sell(@PathVariable Long id, @RequestBody UserMachineOrderActionRequest request) {
         return R.ok(userMachineOrderService.sell(id, request));
     }
 
-    @ApiOperation("Cancel machine order before revenue settlement")
+    @ApiOperation("收益结算前取消矿机订单")
     @PostMapping("/{id}/cancel")
     public R<Map<String, Object>> cancel(@PathVariable Long id, @RequestBody UserMachineOrderActionRequest request) {
         return R.ok(userMachineOrderService.cancel(id, request));
