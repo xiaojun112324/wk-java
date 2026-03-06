@@ -74,6 +74,7 @@ CREATE TABLE `mining_machine` (
   `hashrate_value` decimal(20,8) NOT NULL COMMENT 'single machine hashrate value',
   `hashrate_unit` varchar(8) NOT NULL COMMENT 'H/KH/MH/GH/TH/PH/EH',
   `price_per_unit` decimal(20,8) NOT NULL COMMENT 'single machine price',
+  `lock_days` int(11) DEFAULT '30' COMMENT 'lock period days before sell',
   `status` int(2) DEFAULT '1' COMMENT '1 on sale, 0 off sale',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -100,13 +101,73 @@ CREATE TABLE `user_machine_order` (
   `today_revenue_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'today revenue in CNY',
   `total_revenue_coin` decimal(30,18) DEFAULT '0.000000000000000000' COMMENT 'accumulated revenue in coin',
   `total_revenue_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'accumulated revenue in CNY',
-  `status` int(2) DEFAULT '1' COMMENT '1 active, 0 closed',
+  `lock_until` datetime DEFAULT NULL COMMENT 'cannot sell before this time',
+  `sell_amount_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'settled amount when sold/canceled',
+  `sell_time` datetime DEFAULT NULL COMMENT 'sell/cancel operate time',
+  `status` int(2) DEFAULT '1' COMMENT '1 holding, 2 sold, 3 canceled',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_machine_id` (`machine_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='user mining machine order table';
+
+-- ----------------------------
+-- Table structure for user_wallet
+-- ----------------------------
+DROP TABLE IF EXISTS `user_wallet`;
+CREATE TABLE `user_wallet` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) NOT NULL COMMENT 'user id',
+  `balance_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'available CNY balance',
+  `freeze_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'frozen CNY balance',
+  `total_recharge_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'approved recharge total',
+  `total_withdraw_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'approved withdraw total',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_wallet_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='user wallet table';
+
+-- ----------------------------
+-- Table structure for recharge_order
+-- ----------------------------
+DROP TABLE IF EXISTS `recharge_order`;
+CREATE TABLE `recharge_order` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) NOT NULL COMMENT 'user id',
+  `asset` varchar(16) NOT NULL COMMENT 'USDT/USDC',
+  `network` varchar(16) NOT NULL COMMENT 'TRC20/ERC20',
+  `amount_cny` decimal(30,8) NOT NULL COMMENT 'recharge amount in CNY',
+  `voucher_image` varchar(512) NOT NULL COMMENT 'voucher image path/url',
+  `status` int(2) DEFAULT '0' COMMENT '0 pending, 1 approved, 2 rejected',
+  `audit_remark` varchar(255) DEFAULT NULL COMMENT 'audit remark',
+  `audit_time` datetime DEFAULT NULL COMMENT 'audit time',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_recharge_user` (`user_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='recharge order ticket';
+
+-- ----------------------------
+-- Table structure for withdraw_order
+-- ----------------------------
+DROP TABLE IF EXISTS `withdraw_order`;
+CREATE TABLE `withdraw_order` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) NOT NULL COMMENT 'user id',
+  `asset` varchar(16) NOT NULL COMMENT 'USDT/USDC',
+  `network` varchar(16) NOT NULL COMMENT 'TRC20/ERC20',
+  `amount_cny` decimal(30,8) NOT NULL COMMENT 'withdraw amount in CNY',
+  `receive_address` varchar(255) NOT NULL COMMENT 'user receive address',
+  `status` int(2) DEFAULT '0' COMMENT '0 pending, 1 approved, 2 rejected',
+  `audit_remark` varchar(255) DEFAULT NULL COMMENT 'audit remark',
+  `audit_time` datetime DEFAULT NULL COMMENT 'audit time',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_withdraw_user` (`user_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='withdraw order ticket';
 
 -- ----------------------------
 -- Table structure for mining_coin
@@ -215,4 +276,8 @@ INSERT INTO `mining_coin` (`symbol`, `name`, `algorithm`, `pool_hashrate`, `netw
 
 -- Insert default system config for admin registration
 INSERT INTO `sys_config` (`config_key`, `config_value`, `remark`) VALUES
-('admin_register_invite_code', 'ADMIN2026', 'invite code required for sys_user registration');
+('admin_register_invite_code', 'ADMIN2026', 'invite code required for sys_user registration'),
+('recharge_usdt_trc20_address', 'TRC20_DEMO_ADDRESS', 'system recharge address'),
+('recharge_usdt_erc20_address', 'ERC20_DEMO_ADDRESS', 'system recharge address'),
+('recharge_usdc_trc20_address', 'TRC20_DEMO_ADDRESS', 'system recharge address'),
+('recharge_usdc_erc20_address', 'ERC20_DEMO_ADDRESS', 'system recharge address');
