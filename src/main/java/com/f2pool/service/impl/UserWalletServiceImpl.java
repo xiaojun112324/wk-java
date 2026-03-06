@@ -4,12 +4,16 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.f2pool.dto.wallet.AuditRequest;
 import com.f2pool.dto.wallet.RechargeSubmitRequest;
 import com.f2pool.dto.wallet.WithdrawSubmitRequest;
+import com.f2pool.entity.InviteRebateOrder;
 import com.f2pool.entity.RechargeOrder;
 import com.f2pool.entity.SysConfig;
+import com.f2pool.entity.SysUser;
 import com.f2pool.entity.UserWallet;
 import com.f2pool.entity.WithdrawOrder;
+import com.f2pool.mapper.InviteRebateOrderMapper;
 import com.f2pool.mapper.RechargeOrderMapper;
 import com.f2pool.mapper.SysConfigMapper;
+import com.f2pool.mapper.SysUserMapper;
 import com.f2pool.mapper.UserWalletMapper;
 import com.f2pool.mapper.WithdrawOrderMapper;
 import com.f2pool.service.IUserWalletService;
@@ -19,10 +23,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class UserWalletServiceImpl implements IUserWalletService {
+    private static final String LEVEL1_RATE_KEY = "invite_rebate_level1_rate";
+    private static final String LEVEL2_RATE_KEY = "invite_rebate_level2_rate";
 
     @Autowired
     private UserWalletMapper userWalletMapper;
@@ -32,6 +40,10 @@ public class UserWalletServiceImpl implements IUserWalletService {
     private WithdrawOrderMapper withdrawOrderMapper;
     @Autowired
     private SysConfigMapper sysConfigMapper;
+    @Autowired
+    private SysUserMapper sysUserMapper;
+    @Autowired
+    private InviteRebateOrderMapper inviteRebateOrderMapper;
 
     @Override
     public Map<String, Object> getWallet(Long userId) {
@@ -157,6 +169,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
             wallet.setBalanceCny(wallet.getBalanceCny().add(order.getAmountCny()));
             wallet.setTotalRechargeCny(wallet.getTotalRechargeCny().add(order.getAmountCny()));
             userWalletMapper.updateById(wallet);
+            processInviteRebate(order);
         }
         return buildRecharge(order);
     }
@@ -214,6 +227,119 @@ public class UserWalletServiceImpl implements IUserWalletService {
         userWalletMapper.updateById(wallet);
     }
 
+    @Override
+    public Map<String, Object> getInviteSummary(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        List<SysUser> level1Users = sysUserMapper.selectList(new QueryWrapper<SysUser>().eq("inviter_id", userId));
+        int level1Count = level1Users.size();
+        List<Long> level1Ids = level1Users.stream().map(SysUser::getId).collect(Collectors.toList());
+
+        int level2Count = 0;
+        if (!level1Ids.isEmpty()) {
+            level2Count = Math.toIntExact(sysUserMapper.selectCount(new QueryWrapper<SysUser>().in("inviter_id", level1Ids)));
+        }
+
+        List<InviteRebateOrder> rebateOrders =
+                inviteRebateOrderMapper.selectList(new QueryWrapper<InviteRebateOrder>().eq("beneficiary_user_id", userId));
+        BigDecimal totalRebateCny = rebateOrders.stream()
+                .map(InviteRebateOrder::getRebateAmountCny)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalSourceRechargeCny = rebateOrders.stream()
+                .map(InviteRebateOrder::getSourceRechargeAmountCny)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("userId", userId);
+        map.put("level1Count", level1Count);
+        map.put("level2Count", level2Count);
+        map.put("totalInviteCount", level1Count + level2Count);
+        map.put("level1Rate", getConfigDecimal(LEVEL1_RATE_KEY, BigDecimal.ZERO));
+        map.put("level2Rate", getConfigDecimal(LEVEL2_RATE_KEY, BigDecimal.ZERO));
+        map.put("totalRebateCny", totalRebateCny);
+        map.put("totalSourceRechargeCny", totalSourceRechargeCny);
+        return map;
+    }
+
+    @Override
+    public Map<String, Object> getInviteHierarchy(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        List<SysUser> level1Users = sysUserMapper.selectList(
+                new QueryWrapper<SysUser>().eq("inviter_id", userId).orderByDesc("id")
+        );
+        List<Map<String, Object>> level1List = new ArrayList<>();
+        int level2Total = 0;
+        for (SysUser level1 : level1Users) {
+            List<SysUser> level2Users = sysUserMapper.selectList(
+                    new QueryWrapper<SysUser>().eq("inviter_id", level1.getId()).orderByDesc("id")
+            );
+            level2Total += level2Users.size();
+            Map<String, Object> level1Map = buildInviteUser(level1);
+            level1Map.put("level2Users", level2Users.stream().map(this::buildInviteUser).collect(Collectors.toList()));
+            level1Map.put("level2Count", level2Users.size());
+            level1List.add(level1Map);
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("userId", userId);
+        result.put("level1Count", level1Users.size());
+        result.put("level2Count", level2Total);
+        result.put("totalInviteCount", level1Users.size() + level2Total);
+        result.put("level1Users", level1List);
+        return result;
+    }
+
+    @Override
+    public List<Map<String, Object>> listInviteRebateRecords(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        List<InviteRebateOrder> list = inviteRebateOrderMapper.selectList(
+                new QueryWrapper<InviteRebateOrder>()
+                        .eq("beneficiary_user_id", userId)
+                        .orderByDesc("id")
+        );
+        if (list.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Set<Long> sourceUserIds = list.stream()
+                .map(InviteRebateOrder::getSourceUserId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, SysUser> userMap = new HashMap<>();
+        if (!sourceUserIds.isEmpty()) {
+            List<SysUser> sourceUsers = sysUserMapper.selectList(new QueryWrapper<SysUser>().in("id", sourceUserIds));
+            for (SysUser user : sourceUsers) {
+                userMap.put(user.getId(), user);
+            }
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (InviteRebateOrder item : list) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", item.getId());
+            map.put("beneficiaryUserId", item.getBeneficiaryUserId());
+            map.put("sourceUserId", item.getSourceUserId());
+            map.put("rechargeOrderId", item.getRechargeOrderId());
+            map.put("level", item.getLevel());
+            map.put("sourceRechargeAmountCny", item.getSourceRechargeAmountCny());
+            map.put("rebateRate", item.getRebateRate());
+            map.put("rebateAmountCny", item.getRebateAmountCny());
+            map.put("createTime", item.getCreateTime());
+            SysUser sourceUser = userMap.get(item.getSourceUserId());
+            map.put("sourceUsername", sourceUser == null ? null : sourceUser.getUsername());
+            map.put("sourceEmail", sourceUser == null ? null : sourceUser.getEmail());
+            result.add(map);
+        }
+        return result;
+    }
+
     private void validateRechargeRequest(RechargeSubmitRequest request) {
         if (request == null) throw new IllegalArgumentException("request body is required");
         if (request.getUserId() == null) throw new IllegalArgumentException("userId is required");
@@ -265,6 +391,18 @@ public class UserWalletServiceImpl implements IUserWalletService {
         return config == null ? "" : config.getConfigValue();
     }
 
+    private BigDecimal getConfigDecimal(String key, BigDecimal defaultValue) {
+        String value = getConfig(key);
+        if (!StringUtils.hasText(value)) {
+            return defaultValue;
+        }
+        try {
+            return new BigDecimal(value.trim());
+        } catch (Exception ex) {
+            return defaultValue;
+        }
+    }
+
     private UserWallet getOrCreateWallet(Long userId) {
         UserWallet wallet = userWalletMapper.selectOne(new QueryWrapper<UserWallet>().eq("user_id", userId));
         if (wallet != null) {
@@ -309,6 +447,18 @@ public class UserWalletServiceImpl implements IUserWalletService {
         return map;
     }
 
+    private Map<String, Object> buildInviteUser(SysUser user) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", user.getId());
+        map.put("username", user.getUsername());
+        map.put("email", user.getEmail());
+        map.put("inviteCode", user.getInviteCode());
+        map.put("inviterId", user.getInviterId());
+        map.put("status", user.getStatus());
+        map.put("createTime", user.getCreateTime());
+        return map;
+    }
+
     private Map<String, Object> buildWithdraw(WithdrawOrder order) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", order.getId());
@@ -322,5 +472,64 @@ public class UserWalletServiceImpl implements IUserWalletService {
         map.put("auditTime", order.getAuditTime());
         map.put("createTime", order.getCreateTime());
         return map;
+    }
+
+    private void processInviteRebate(RechargeOrder order) {
+        if (order == null || order.getId() == null || order.getUserId() == null || order.getAmountCny() == null) {
+            return;
+        }
+        SysUser sourceUser = sysUserMapper.selectById(order.getUserId());
+        if (sourceUser == null || sourceUser.getInviterId() == null) {
+            return;
+        }
+
+        BigDecimal level1Rate = getConfigDecimal(LEVEL1_RATE_KEY, BigDecimal.ZERO);
+        BigDecimal level2Rate = getConfigDecimal(LEVEL2_RATE_KEY, BigDecimal.ZERO);
+
+        Long level1UserId = sourceUser.getInviterId();
+        if (level1Rate.compareTo(BigDecimal.ZERO) > 0) {
+            grantInviteRebate(level1UserId, sourceUser.getId(), order, 1, level1Rate);
+        }
+
+        SysUser level1User = sysUserMapper.selectById(level1UserId);
+        if (level1User != null && level1User.getInviterId() != null && level2Rate.compareTo(BigDecimal.ZERO) > 0) {
+            grantInviteRebate(level1User.getInviterId(), sourceUser.getId(), order, 2, level2Rate);
+        }
+    }
+
+    private void grantInviteRebate(Long beneficiaryUserId, Long sourceUserId, RechargeOrder order, int level, BigDecimal rate) {
+        if (beneficiaryUserId == null || sourceUserId == null) {
+            return;
+        }
+        Long exists = inviteRebateOrderMapper.selectCount(
+                new QueryWrapper<InviteRebateOrder>()
+                        .eq("beneficiary_user_id", beneficiaryUserId)
+                        .eq("recharge_order_id", order.getId())
+                        .eq("level", level)
+        );
+        if (exists != null && exists > 0) {
+            return;
+        }
+
+        BigDecimal rebateAmount = order.getAmountCny()
+                .multiply(rate)
+                .setScale(8, RoundingMode.HALF_UP);
+        if (rebateAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        UserWallet beneficiaryWallet = getOrCreateWallet(beneficiaryUserId);
+        beneficiaryWallet.setBalanceCny(beneficiaryWallet.getBalanceCny().add(rebateAmount));
+        userWalletMapper.updateById(beneficiaryWallet);
+
+        InviteRebateOrder rebateOrder = new InviteRebateOrder();
+        rebateOrder.setBeneficiaryUserId(beneficiaryUserId);
+        rebateOrder.setSourceUserId(sourceUserId);
+        rebateOrder.setRechargeOrderId(order.getId());
+        rebateOrder.setLevel(level);
+        rebateOrder.setSourceRechargeAmountCny(order.getAmountCny());
+        rebateOrder.setRebateRate(rate);
+        rebateOrder.setRebateAmountCny(rebateAmount);
+        inviteRebateOrderMapper.insert(rebateOrder);
     }
 }

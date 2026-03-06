@@ -1,35 +1,40 @@
-# 钱包、持仓卖出、充值提现工单接口
+# 钱包、充值提现、审核接口文档
 
 更新时间：2026-03-06
 
-## 1) 持仓单新增能力
+## 1. 功能范围
 
-- 卖出：`POST /api/order/machine/{id}/sell`（需过锁仓期）
-- 取消：`POST /api/order/machine/{id}/cancel`（仅无累计收益时可取消）
-- 请求体：
+本模块包含：
 
-```json
-{
-  "userId": 1001
-}
-```
+- 用户钱包余额查询
+- 用户充值工单提交与查询
+- 用户提现工单提交与查询
+- 管理员审核充值/提现
+- 充值审核通过后触发邀请返利
 
-订单状态：
+## 2. 用户接口
 
-- `1` 持仓中
-- `2` 已卖出
-- `3` 已取消
+### 2.1 钱包账户
 
-## 2) 用户钱包接口
+- Method: `GET`
+- Path: `/api/wallet/account`
+- Query: `userId`
 
-- 查询钱包：`GET /api/wallet/account?userId=1001`
-- 充值地址：`GET /api/wallet/recharge/address`
-- 提交充值工单：`POST /api/wallet/recharge/submit`
-- 提交提现工单：`POST /api/wallet/withdraw/submit`
-- 用户充值单列表：`GET /api/wallet/recharge/list?userId=1001`
-- 用户提现单列表：`GET /api/wallet/withdraw/list?userId=1001`
+返回：余额、冻结金额、累计充值、累计提现。
 
-充值提交示例：
+### 2.2 充值地址
+
+- Method: `GET`
+- Path: `/api/wallet/recharge/address`
+
+返回系统配置的 USDT/USDC 收款地址（TRC20/ERC20）。
+
+### 2.3 提交充值工单
+
+- Method: `POST`
+- Path: `/api/wallet/recharge/submit`
+
+请求体：
 
 ```json
 {
@@ -41,7 +46,12 @@
 }
 ```
 
-提现提交示例：
+### 2.4 提交提现工单
+
+- Method: `POST`
+- Path: `/api/wallet/withdraw/submit`
+
+请求体：
 
 ```json
 {
@@ -53,14 +63,36 @@
 }
 ```
 
-## 3) 后台审核接口
+### 2.5 充值工单列表
 
-- 待审核充值：`GET /api/admin/wallet/recharge/pending`
-- 待审核提现：`GET /api/admin/wallet/withdraw/pending`
-- 审核充值：`POST /api/admin/wallet/recharge/{id}/audit`
-- 审核提现：`POST /api/admin/wallet/withdraw/{id}/audit`
+- Method: `GET`
+- Path: `/api/wallet/recharge/list`
+- Query: `userId`
 
-审核请求体：
+### 2.6 提现工单列表
+
+- Method: `GET`
+- Path: `/api/wallet/withdraw/list`
+- Query: `userId`
+
+## 3. 管理员审核接口
+
+### 3.1 待审核充值列表
+
+- Method: `GET`
+- Path: `/api/admin/wallet/recharge/pending`
+
+### 3.2 待审核提现列表
+
+- Method: `GET`
+- Path: `/api/admin/wallet/withdraw/pending`
+
+### 3.3 审核充值
+
+- Method: `POST`
+- Path: `/api/admin/wallet/recharge/{id}/audit`
+
+请求体：
 
 ```json
 {
@@ -69,12 +101,32 @@
 }
 ```
 
-- `status=1` 通过
-- `status=2` 驳回
+状态：
 
-## 4) sys_config 需要配置
+- `status=1`：通过
+- `status=2`：拒绝
 
-- `recharge_usdt_trc20_address`
-- `recharge_usdt_erc20_address`
-- `recharge_usdc_trc20_address`
-- `recharge_usdc_erc20_address`
+### 3.4 审核提现
+
+- Method: `POST`
+- Path: `/api/admin/wallet/withdraw/{id}/audit`
+
+请求体同上。
+
+## 4. 返利触发说明（重点）
+
+当充值工单审核通过（`status=1`）时：
+
+1. 给当前充值用户加款。
+2. 若充值用户存在上级（`inviterId`），按配置给一级上级返利。
+3. 若一级上级还有上级，再按配置给二级上级返利。
+4. 每笔返利写入返利记录表，支持后续查询。
+
+## 5. 常见错误
+
+- `userId is required`
+- `amountCny must be greater than 0`
+- `insufficient balance`
+- `recharge order not found`
+- `recharge order already audited`
+- `status must be 1(approve) or 2(reject)`

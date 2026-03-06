@@ -1,46 +1,54 @@
-# Banner与文件上传接口文档（前端联调）
+# 轮播图与文件上传接口文档
 
-更新时间：2026-03-05
+更新时间：2026-03-06
 
-## 1. Banner CRUD（管理员）
+## 1. 轮播图接口（管理端）
 
 接口前缀：`/api/admin/banner`
 
-### 1.1 新增 Banner
+### 1.1 新增
 
-- `POST /api/admin/banner`
-
-请求体：
-
-```json
-{
-  "image": "/upload/xxx.png"
-}
-```
-
-### 1.2 修改 Banner
-
-- `PUT /api/admin/banner/{id}`
+- Method: `POST`
+- Path: `/api/admin/banner`
 
 请求体：
 
 ```json
 {
-  "image": "/upload/xxx-new.png"
+  "image": "/upload/banner-001.png"
 }
 ```
 
-### 1.3 删除 Banner
+### 1.2 修改
 
-- `DELETE /api/admin/banner/{id}`
+- Method: `PUT`
+- Path: `/api/admin/banner/{id}`
 
-### 1.4 Banner 详情
+### 1.3 删除
 
-- `GET /api/admin/banner/{id}`
+- Method: `DELETE`
+- Path: `/api/admin/banner/{id}`
 
-### 1.5 Banner 列表
+### 1.4 详情
 
-- `GET /api/admin/banner/list`
+- Method: `GET`
+- Path: `/api/admin/banner/{id}`
+
+### 1.5 列表
+
+- Method: `GET`
+- Path: `/api/admin/banner/list`
+
+## 2. 文件上传接口（管理端）
+
+接口前缀：`/api/admin/file`
+
+### 2.1 上传文件
+
+- Method: `POST`
+- Path: `/api/admin/file/upload`
+- Content-Type: `multipart/form-data`
+- 参数：`file`
 
 返回示例：
 
@@ -48,42 +56,14 @@
 {
   "code": 200,
   "msg": "success",
-  "data": [
-    {
-      "id": 3,
-      "image": "/upload/xxx.png",
-      "createTime": "2026-03-05T10:00:00.000+00:00",
-      "updateTime": "2026-03-05T10:00:00.000+00:00"
-    }
-  ]
-}
-```
-
----
-
-## 2. 文件上传（管理员）
-
-接口前缀：`/api/admin/file`
-
-### 2.1 上传文件
-
-- `POST /api/admin/file/upload`
-- `Content-Type: multipart/form-data`
-- 参数：`file`（文件）
-- 上传目录：`/www/wwwroot/upload`
-
-成功返回：
-
-```json
-{
-  "code": 200,
-  "msg": "success",
   "data": {
-    "fileName": "a4e5c1f2....png",
-    "path": "/www/wwwroot/upload/a4e5c1f2....png",
-    "relativePath": "/upload/a4e5c1f2....png"
+    "fileName": "a4e5c1f2.png",
+    "path": "/www/wwwroot/upload/a4e5c1f2.png",
+    "relativePath": "/upload/a4e5c1f2.png"
   }
 }
 ```
 
-前端建议：上传成功后取 `relativePath` 作为 `image` 字段，传给 Banner 新增/修改接口。
+前端建议：
+
+- 将 `relativePath` 存为 banner 的 `image` 字段值。

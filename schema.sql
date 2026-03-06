@@ -170,6 +170,26 @@ CREATE TABLE `withdraw_order` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='withdraw order ticket';
 
 -- ----------------------------
+-- Table structure for invite_rebate_order
+-- ----------------------------
+DROP TABLE IF EXISTS `invite_rebate_order`;
+CREATE TABLE `invite_rebate_order` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `beneficiary_user_id` bigint(20) NOT NULL COMMENT 'inviter user id who receives rebate',
+  `source_user_id` bigint(20) NOT NULL COMMENT 'downline user id who recharged',
+  `recharge_order_id` bigint(20) NOT NULL COMMENT 'source recharge order id',
+  `level` int(2) NOT NULL COMMENT '1 first-level, 2 second-level',
+  `source_recharge_amount_cny` decimal(30,8) NOT NULL COMMENT 'source recharge amount',
+  `rebate_rate` decimal(12,8) NOT NULL COMMENT 'rebate rate from sys_config',
+  `rebate_amount_cny` decimal(30,8) NOT NULL COMMENT 'rebate amount',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_rebate_unique` (`beneficiary_user_id`,`recharge_order_id`,`level`),
+  KEY `idx_rebate_beneficiary` (`beneficiary_user_id`,`id`),
+  KEY `idx_rebate_source` (`source_user_id`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='invite rebate records';
+
+-- ----------------------------
 -- Table structure for mining_coin
 -- ----------------------------
 DROP TABLE IF EXISTS `mining_coin`;
@@ -280,4 +300,6 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `remark`) VALUES
 ('recharge_usdt_trc20_address', 'TRC20_DEMO_ADDRESS', 'system recharge address'),
 ('recharge_usdt_erc20_address', 'ERC20_DEMO_ADDRESS', 'system recharge address'),
 ('recharge_usdc_trc20_address', 'TRC20_DEMO_ADDRESS', 'system recharge address'),
-('recharge_usdc_erc20_address', 'ERC20_DEMO_ADDRESS', 'system recharge address');
+('recharge_usdc_erc20_address', 'ERC20_DEMO_ADDRESS', 'system recharge address'),
+('invite_rebate_level1_rate', '0.05000000', 'first-level invite rebate rate for approved recharge'),
+('invite_rebate_level2_rate', '0.02000000', 'second-level invite rebate rate for approved recharge');

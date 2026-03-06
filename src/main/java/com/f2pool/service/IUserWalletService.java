@@ -32,4 +32,10 @@ public interface IUserWalletService {
     void decreaseBalance(Long userId, BigDecimal amount);
 
     void increaseBalance(Long userId, BigDecimal amount);
+
+    Map<String, Object> getInviteSummary(Long userId);
+
+    Map<String, Object> getInviteHierarchy(Long userId);
+
+    List<Map<String, Object>> listInviteRebateRecords(Long userId);
 }
