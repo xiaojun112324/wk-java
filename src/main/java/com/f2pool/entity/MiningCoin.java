@@ -21,6 +21,7 @@ public class MiningCoin {
     private String networkHashrate;
     private BigDecimal priceCny;
     private BigDecimal dailyRevenuePerT;
+    private String revenueUnit; // T/G/M
     private Integer status;
 
     // New Fields with explicit mapping
