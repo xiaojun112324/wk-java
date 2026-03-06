@@ -301,5 +301,6 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `remark`) VALUES
 ('recharge_usdt_erc20_address', 'ERC20_DEMO_ADDRESS', 'system recharge address'),
 ('recharge_usdc_trc20_address', 'TRC20_DEMO_ADDRESS', 'system recharge address'),
 ('recharge_usdc_erc20_address', 'ERC20_DEMO_ADDRESS', 'system recharge address'),
+('machine_price_per_p_usd', '120', 'unit price per P in USD for coin detail buy-by-p'),
 ('invite_rebate_level1_rate', '0.05000000', 'first-level invite rebate rate for approved recharge'),
 ('invite_rebate_level2_rate', '0.02000000', 'second-level invite rebate rate for approved recharge');

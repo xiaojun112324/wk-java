@@ -4,6 +4,7 @@ import com.f2pool.common.ApiException;
 import com.f2pool.common.R;
 import com.f2pool.common.TokenContextUtil;
 import com.f2pool.dto.machine.UserMachineOrderActionRequest;
+import com.f2pool.dto.machine.UserMachineOrderBuyByPRequest;
 import com.f2pool.dto.machine.UserMachineOrderCreateRequest;
 import com.f2pool.service.IUserMachineOrderService;
 import io.swagger.annotations.Api;
@@ -37,6 +38,15 @@ public class UserMachineOrderController {
         Long userId = tokenContextUtil.requireUserId(authorization);
         request.setUserId(userId);
         return R.ok(userMachineOrderService.createOrder(request));
+    }
+
+    @ApiOperation("按币种按P购买订单")
+    @PostMapping("/buy-by-p")
+    public R<Map<String, Object>> createByP(@RequestHeader("Authorization") String authorization,
+                                            @RequestBody UserMachineOrderBuyByPRequest request) {
+        Long userId = tokenContextUtil.requireUserId(authorization);
+        request.setUserId(userId);
+        return R.ok(userMachineOrderService.createOrderByP(request));
     }
 
     @ApiOperation("矿机订单列表")

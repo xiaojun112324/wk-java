@@ -1,8 +1,11 @@
 package com.f2pool.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.f2pool.common.ApiException;
 import com.f2pool.common.R;
+import com.f2pool.entity.Banner;
 import com.f2pool.entity.MiningCoin;
+import com.f2pool.service.IBannerService;
 import com.f2pool.service.IMiningCoinService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -26,6 +29,9 @@ public class PublicController {
 
     @Autowired
     private IMiningCoinService miningCoinService;
+
+    @Autowired
+    private IBannerService bannerService;
 
     @ApiOperation("Get pool stats")
     @GetMapping("/pool/stats")
@@ -55,6 +61,13 @@ public class PublicController {
             throw ApiException.notFound("coin not found");
         }
         return R.ok(coin);
+    }
+
+    @ApiOperation("Get banner list")
+    @GetMapping("/banner/list")
+    public R<List<Banner>> bannerList() {
+        List<Banner> list = bannerService.list(new QueryWrapper<Banner>().orderByDesc("id"));
+        return R.ok(list);
     }
 
     @ApiOperation("Coin price trend (7/30/180/365 days)")

@@ -22,6 +22,7 @@
 ### 矿机面板
 - GET /api/admin/machine/list
 - POST /api/order/machine
+- POST /api/order/machine/buy-by-p
 - GET /api/order/machine/list
 - GET /api/order/machine/{id}
 - POST /api/order/machine/{id}/sell

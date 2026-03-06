@@ -266,6 +266,29 @@
 - Header: `Authorization`
 - 返回 `data`: `UserMachineOrderView`（字段同 2.2，`status=3`）
 
+### 2.7 按P购买（币种详情页）
+- Method: `POST`
+- Path: `/api/order/machine/buy-by-p`
+- Header: `Authorization`
+- 说明：按币种直接购买算力，单位为 `P`。每P单价来自 `sys_config.machine_price_per_p_usd`（USD），后端按汇率折算为 CNY 扣款并生成订单。
+- 请求体：
+
+```json
+{
+  "coinSymbol": "BTC",
+  "pCount": 1.5
+}
+```
+
+- 返回 `data`: `UserMachineOrderView`（字段同 2.2）并附加：
+
+```json
+{
+  "pricePerPUsd": 120.00000000,
+  "usdCny": 7.20000000
+}
+```
+
 ## 3. 收益
 
 ### 3.1 账户资产

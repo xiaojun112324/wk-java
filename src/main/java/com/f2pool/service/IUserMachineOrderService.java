@@ -2,6 +2,7 @@ package com.f2pool.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.f2pool.dto.machine.UserMachineOrderActionRequest;
+import com.f2pool.dto.machine.UserMachineOrderBuyByPRequest;
 import com.f2pool.dto.machine.UserMachineOrderCreateRequest;
 import com.f2pool.entity.UserMachineOrder;
 
@@ -10,6 +11,7 @@ import java.util.Map;
 
 public interface IUserMachineOrderService extends IService<UserMachineOrder> {
     Map<String, Object> createOrder(UserMachineOrderCreateRequest request);
+    Map<String, Object> createOrderByP(UserMachineOrderBuyByPRequest request);
 
     List<Map<String, Object>> listByUserId(Long userId);
 

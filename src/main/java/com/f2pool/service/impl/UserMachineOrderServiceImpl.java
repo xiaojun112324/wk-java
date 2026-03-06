@@ -3,10 +3,13 @@ package com.f2pool.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.f2pool.dto.machine.UserMachineOrderActionRequest;
+import com.f2pool.dto.machine.UserMachineOrderBuyByPRequest;
 import com.f2pool.dto.machine.UserMachineOrderCreateRequest;
 import com.f2pool.entity.MiningCoin;
 import com.f2pool.entity.MiningMachine;
+import com.f2pool.entity.SysConfig;
 import com.f2pool.entity.UserMachineOrder;
+import com.f2pool.mapper.SysConfigMapper;
 import com.f2pool.mapper.UserMachineOrderMapper;
 import com.f2pool.service.IMiningCoinService;
 import com.f2pool.service.IMiningMachineService;
@@ -14,8 +17,10 @@ import com.f2pool.service.IUserMachineOrderService;
 import com.f2pool.service.IUserWalletService;
 import com.f2pool.util.HashrateUnitUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -28,6 +33,9 @@ import java.util.Map;
 @Service
 public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMapper, UserMachineOrder> implements IUserMachineOrderService {
     private static final BigDecimal TH_PER_PH = new BigDecimal("1000");
+    private static final String PRICE_PER_P_USD_KEY = "machine_price_per_p_usd";
+    private static final String USD_CNY_CACHE_KEY = "f2pool:cache:fx:usd_cny";
+    private static final BigDecimal DEFAULT_USD_CNY = new BigDecimal("7.2");
 
     @Autowired
     private IMiningMachineService miningMachineService;
@@ -36,6 +44,10 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     private IMiningCoinService miningCoinService;
     @Autowired
     private IUserWalletService userWalletService;
+    @Autowired
+    private SysConfigMapper sysConfigMapper;
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     @Transactional
@@ -95,6 +107,64 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         save(order);
 
         return buildOrderView(order);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> createOrderByP(UserMachineOrderBuyByPRequest request) {
+        validateBuyByPRequest(request);
+
+        String symbol = request.getCoinSymbol().trim().toUpperCase();
+        BigDecimal pCount = request.getPCount().setScale(8, RoundingMode.HALF_UP);
+        BigDecimal pricePerPUsd = getConfigDecimal(PRICE_PER_P_USD_KEY);
+        if (pricePerPUsd.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("sys_config machine_price_per_p_usd must be greater than 0");
+        }
+        BigDecimal usdCny = getUsdCnyRate();
+        BigDecimal unitPriceCny = pricePerPUsd.multiply(usdCny).setScale(8, RoundingMode.HALF_UP);
+        BigDecimal totalInvest = unitPriceCny.multiply(pCount).setScale(8, RoundingMode.HALF_UP);
+        userWalletService.decreaseBalance(request.getUserId(), totalInvest);
+
+        MiningCoin coin = miningCoinService.getCoinDetail(null, symbol);
+        if (coin == null) {
+            throw new IllegalArgumentException("coin not found");
+        }
+
+        BigDecimal totalHashrateTh = pCount.multiply(TH_PER_PH).setScale(8, RoundingMode.HALF_UP);
+        BigDecimal todayRevenueCoin = BigDecimal.ZERO;
+        BigDecimal todayRevenueCny = BigDecimal.ZERO;
+        if (coin.getDailyRevenuePerP() != null) {
+            todayRevenueCoin = pCount.multiply(coin.getDailyRevenuePerP()).setScale(12, RoundingMode.HALF_UP);
+            if (coin.getPriceCny() != null) {
+                todayRevenueCny = todayRevenueCoin.multiply(coin.getPriceCny()).setScale(8, RoundingMode.HALF_UP);
+            }
+        }
+
+        UserMachineOrder order = new UserMachineOrder();
+        order.setUserId(request.getUserId());
+        order.setMachineId(0L);
+        order.setCoinSymbol(symbol);
+        order.setMachineName(symbol + " P合约");
+        order.setHashrateValue(pCount);
+        order.setHashrateUnit("PH");
+        order.setQuantity(1);
+        order.setUnitPrice(unitPriceCny);
+        order.setTotalInvest(totalInvest);
+        order.setTotalHashrateTh(totalHashrateTh);
+        order.setTodayRevenueCoin(todayRevenueCoin);
+        order.setTodayRevenueCny(todayRevenueCny);
+        order.setTotalRevenueCoin(BigDecimal.ZERO.setScale(18, RoundingMode.HALF_UP));
+        order.setTotalRevenueCny(BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP));
+        int lockDays = 30;
+        order.setLockUntil(new Date(System.currentTimeMillis() + lockDays * 24L * 60L * 60L * 1000L));
+        order.setSellAmountCny(BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP));
+        order.setStatus(1);
+        save(order);
+
+        Map<String, Object> view = buildOrderView(order);
+        view.put("pricePerPUsd", pricePerPUsd);
+        view.put("usdCny", usdCny);
+        return view;
     }
 
     @Override
@@ -167,6 +237,47 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         if (request.getQuantity() == null || request.getQuantity() <= 0) {
             throw new IllegalArgumentException("quantity must be greater than 0");
         }
+    }
+
+    private void validateBuyByPRequest(UserMachineOrderBuyByPRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("request body is required");
+        }
+        if (request.getUserId() == null) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (!StringUtils.hasText(request.getCoinSymbol())) {
+            throw new IllegalArgumentException("coinSymbol is required");
+        }
+        if (request.getPCount() == null || request.getPCount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("pCount must be greater than 0");
+        }
+    }
+
+    private BigDecimal getConfigDecimal(String key) {
+        SysConfig config = sysConfigMapper.selectOne(new QueryWrapper<SysConfig>().eq("config_key", key).eq("status", 1));
+        if (config == null || !StringUtils.hasText(config.getConfigValue())) {
+            return BigDecimal.ZERO;
+        }
+        try {
+            return new BigDecimal(config.getConfigValue().trim());
+        } catch (Exception e) {
+            return BigDecimal.ZERO;
+        }
+    }
+
+    private BigDecimal getUsdCnyRate() {
+        try {
+            String val = stringRedisTemplate.opsForValue().get(USD_CNY_CACHE_KEY);
+            if (StringUtils.hasText(val)) {
+                BigDecimal rate = new BigDecimal(val.trim());
+                if (rate.compareTo(BigDecimal.ZERO) > 0) {
+                    return rate;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return DEFAULT_USD_CNY;
     }
 
     private UserMachineOrder getOrderForOperate(Long id, UserMachineOrderActionRequest request) {
