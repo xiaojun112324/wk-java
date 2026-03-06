@@ -89,7 +89,7 @@ public class GlobalExceptionHandler {
         if (text.contains("not found")) {
             return HttpStatus.NOT_FOUND;
         }
-        if (text.contains("does not belong") || text.contains("disabled")) {
+        if (text.contains("does not belong") || text.contains("disabled") || text.contains("forbidden")) {
             return HttpStatus.FORBIDDEN;
         }
         return HttpStatus.BAD_REQUEST;

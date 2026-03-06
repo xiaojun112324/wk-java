@@ -3,7 +3,9 @@ package com.f2pool.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.f2pool.entity.MiningWorker;
+import com.f2pool.entity.UserMachineOrder;
 import com.f2pool.mapper.MiningWorkerMapper;
+import com.f2pool.mapper.UserMachineOrderMapper;
 import com.f2pool.service.IMiningWorkerService;
 import com.f2pool.entity.MiningCoin;
 import com.f2pool.service.IMiningCoinService;
@@ -19,6 +21,8 @@ public class MiningWorkerServiceImpl extends ServiceImpl<MiningWorkerMapper, Min
 
     @Autowired
     private IMiningCoinService miningCoinService;
+    @Autowired
+    private UserMachineOrderMapper userMachineOrderMapper;
 
     @Override
     public Map<String, Object> getWorkerStats(Long userId) {
@@ -85,5 +89,66 @@ public class MiningWorkerServiceImpl extends ServiceImpl<MiningWorkerMapper, Min
             chart.add(point);
         }
         return chart;
+    }
+
+    @Override
+    public Map<String, Object> getRevenueOverview(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId is required");
+        }
+
+        long totalWorkers = count(new QueryWrapper<MiningWorker>().eq("user_id", userId));
+        long onlineWorkers = count(new QueryWrapper<MiningWorker>().eq("user_id", userId).eq("status", 1));
+        long offlineWorkers = totalWorkers - onlineWorkers;
+
+        BigDecimal totalHashrate24h = sumHashrateByUser(userId);
+        BigDecimal avgHashrate24h = totalHashrate24h;
+
+        MiningCoin btc = miningCoinService.query().eq("symbol", "BTC").one();
+        BigDecimal dailyRevenuePerT = (btc == null || btc.getDailyRevenuePerT() == null)
+                ? BigDecimal.ZERO
+                : btc.getDailyRevenuePerT();
+
+        BigDecimal yesterdayRevenueCoin = totalHashrate24h.multiply(dailyRevenuePerT).setScale(8, RoundingMode.HALF_UP);
+        BigDecimal todayMinedCoin = yesterdayRevenueCoin.multiply(new BigDecimal("0.60")).setScale(8, RoundingMode.HALF_UP);
+
+        BigDecimal totalRevenueCoin = sumTotalRevenueCoinByUser(userId);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("totalWorkers", totalWorkers);
+        result.put("onlineWorkers", onlineWorkers);
+        result.put("offlineWorkers", offlineWorkers);
+        result.put("todayMinedCoin", todayMinedCoin);
+        result.put("yesterdayRevenueCoin", yesterdayRevenueCoin);
+        result.put("totalRevenueCoin", totalRevenueCoin);
+        result.put("avgHashrate24h", avgHashrate24h);
+        result.put("hashrateUnit", "TH/s");
+        result.put("coinSymbol", "BTC");
+        return result;
+    }
+
+    private BigDecimal sumHashrateByUser(Long userId) {
+        List<MiningWorker> workers = list(new QueryWrapper<MiningWorker>().eq("user_id", userId));
+        return workers.stream()
+                .map(MiningWorker::getHashrate)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(8, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal sumTotalRevenueCoinByUser(Long userId) {
+        List<Map<String, Object>> rows = userMachineOrderMapper.selectMaps(
+                new QueryWrapper<UserMachineOrder>()
+                        .select("COALESCE(SUM(total_revenue_coin), 0) AS totalRevenueCoin")
+                        .eq("user_id", userId)
+        );
+        if (rows == null || rows.isEmpty()) {
+            return BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP);
+        }
+        Object val = rows.get(0).get("totalRevenueCoin");
+        if (val == null) {
+            return BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP);
+        }
+        return new BigDecimal(String.valueOf(val)).setScale(8, RoundingMode.HALF_UP);
     }
 }

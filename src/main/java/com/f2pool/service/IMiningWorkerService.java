@@ -8,4 +8,5 @@ import java.util.Map;
 public interface IMiningWorkerService extends IService<MiningWorker> {
     Map<String, Object> getWorkerStats(Long userId);
     List<Map<String, Object>> getHashrateChart(Long userId, String timeRange);
+    Map<String, Object> getRevenueOverview(Long userId);
 }
