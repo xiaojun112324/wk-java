@@ -12,6 +12,8 @@
 - GET /api/public/pool/stats
 - GET /api/public/rank/pow
 - GET /api/public/pool/rankings
+- GET /api/public/coin/detail
+- GET /api/public/coin/chart
 - GET /api/public/tool/calculator
 - GET /api/dashboard/worker/stats
 - GET /api/dashboard/hashrate/chart

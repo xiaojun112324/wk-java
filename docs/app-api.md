@@ -21,6 +21,7 @@
 ### 1.1 矿池统计
 - Method: `GET`
 - Path: `/api/public/pool/stats`
+- 数据来源：优先读取 Redis 币价缓存（缓存刷新频率 2 秒）
 - 返回 `data`: `MiningCoin[]`
 
 ```json
@@ -145,6 +146,35 @@
   "hashrateUnit": "TH/s",
   "coinSymbol": "BTC"
 }
+```
+
+### 1.8 币种详情
+- Method: `GET`
+- Path: `/api/public/coin/detail`
+- Query:
+  - `id`（可选，币种ID）
+  - `symbol`（可选，币种符号，如 BTC）
+- 返回 `data`: `MiningCoin`（字段同 1.1 单项）
+
+### 1.9 币价走势
+- Method: `GET`
+- Path: `/api/public/coin/chart`
+- 数据源：外部真实币价数据源（CoinGecko），仅日线（`interval=daily`）
+- 读取策略：接口只读 Redis 走势缓存（后台每 1 小时刷新一次）
+- Query:
+  - `id`（可选，币种ID）
+  - `symbol`（可选，币种符号）
+  - `days`（可选，支持 `7`、`30`、`180`、`365`，默认 `7`）
+- 返回 `data`: `CoinChartPoint[]`（若数据源不可用或该币未映射，返回空数组，不做本地估算）
+
+```json
+[
+  {
+    "time": 1741248000000,
+    "priceCny": 454321.12000000,
+    "changePct": -1.2345
+  }
+]
 ```
 
 ## 2. 矿机面板
@@ -535,4 +565,3 @@
 - Path: `/api/wallet/withdraw/list`
 - Header: `Authorization`
 - 返回 `data`: `WithdrawOrderView[]`（字段同 4.7）
-

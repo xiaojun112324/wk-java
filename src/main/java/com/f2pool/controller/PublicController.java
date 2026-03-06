@@ -18,7 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@Api(tags = "公共数据接口")
+@Api(tags = "Public API")
 @RestController
 @RequestMapping("/api/public")
 public class PublicController {
@@ -27,25 +27,54 @@ public class PublicController {
     @Autowired
     private IMiningCoinService miningCoinService;
 
-    @ApiOperation("获取矿池统计")
+    @ApiOperation("Get pool stats")
     @GetMapping("/pool/stats")
     public R<List<MiningCoin>> getPoolStats() {
         return R.ok(miningCoinService.getPoolStats());
     }
 
-    @ApiOperation("获取 PoW 收益排行")
+    @ApiOperation("Get PoW revenue rankings")
     @GetMapping("/rank/pow")
     public R<List<MiningCoin>> getPowRankings() {
         return R.ok(miningCoinService.getPowRankings());
     }
 
-    @ApiOperation("获取矿池排行")
+    @ApiOperation("Get pool rankings")
     @GetMapping("/pool/rankings")
     public R<List<Map<String, Object>>> getPoolRankings() {
         return R.ok(miningCoinService.getRealPoolRankings());
     }
 
-    @ApiOperation("挖矿收益计算器")
+    @ApiOperation("Get coin detail")
+    @GetMapping("/coin/detail")
+    public R<MiningCoin> coinDetail(
+            @ApiParam(value = "coin id", example = "1") @RequestParam(required = false) Long id,
+            @ApiParam(value = "coin symbol", example = "BTC") @RequestParam(required = false) String symbol) {
+        MiningCoin coin = miningCoinService.getCoinDetail(id, symbol);
+        if (coin == null) {
+            throw ApiException.notFound("coin not found");
+        }
+        return R.ok(coin);
+    }
+
+    @ApiOperation("Coin price trend (7/30/180/365 days)")
+    @GetMapping("/coin/chart")
+    public R<List<Map<String, Object>>> coinChart(
+            @ApiParam(value = "coin id", example = "1") @RequestParam(required = false) Long id,
+            @ApiParam(value = "coin symbol", example = "BTC") @RequestParam(required = false) String symbol,
+            @ApiParam(value = "days: 7/30/180/365", example = "7") @RequestParam(defaultValue = "7") Integer days) {
+
+        int safeDays;
+        if (days != null && (days == 7 || days == 30 || days == 180 || days == 365)) {
+            safeDays = days;
+        } else {
+            safeDays = 7;
+        }
+        List<Map<String, Object>> chart = miningCoinService.getCoinPriceTrend(id, symbol, safeDays);
+        return R.ok(chart);
+    }
+
+    @ApiOperation("Mining revenue calculator")
     @GetMapping("/tool/calculator")
     public R<Map<String, Object>> calculate(
             @ApiParam(value = "Coin symbol", required = true, example = "BTC") @RequestParam String symbol,
