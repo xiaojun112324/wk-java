@@ -7,6 +7,7 @@ CREATE TABLE `user` (
   `username` varchar(64) NOT NULL COMMENT 'account username',
   `email` varchar(128) NOT NULL COMMENT 'account email',
   `password` varchar(128) NOT NULL COMMENT 'encrypted password',
+  `withdraw_password` varchar(128) DEFAULT NULL COMMENT 'encrypted withdraw password',
   `invite_code` varchar(32) NOT NULL COMMENT 'self invite code',
   `inviter_id` bigint(20) DEFAULT NULL COMMENT 'parent inviter user id',
   `status` int(2) DEFAULT '1' COMMENT '1 active, 0 disabled',

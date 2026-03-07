@@ -99,27 +99,32 @@ public class CoinMarketCacheTask {
     @Scheduled(fixedRate = 3600000, initialDelay = 10000)
     public void refreshTrendCache() {
         BigDecimal usdCny = getUsdCnyRate();
-        JSONObject marketBySymbol = fetchOkxMarket(usdCny);
         for (Map.Entry<String, String> entry : OKX_INST_ID_MAP.entrySet()) {
             String symbol = entry.getKey();
             String instId = entry.getValue();
-            for (int days : TREND_DAYS) {
-                try {
-                    List<JSONArray> candles = fetchHistoryCandles(instId, days);
-                    List<Map<String, Object>> points;
-                    if (candles.isEmpty()) {
-                        BigDecimal currentPrice = getCurrentPriceFromMarket(marketBySymbol, symbol);
-                        points = buildFlatTrend(days, currentPrice);
-                    } else {
-                        points = toTrendPointsFromCandles(candles, days, usdCny);
+            try {
+                // Fetch once with max window and then slice to 7/30/180/365, to reduce request count.
+                List<JSONArray> candles = fetchHistoryCandles(instId, 365);
+                for (int days : TREND_DAYS) {
+                    try {
+                        List<Map<String, Object>> points;
+                        if (candles.isEmpty()) {
+                            // Never overwrite with synthetic flat lines; keep old cache if present.
+                            // If no cache exists, API will return empty trend instead of misleading straight lines.
+                            continue;
+                        } else {
+                            points = toTrendPointsFromCandles(candles, days, usdCny);
+                        }
+                        if (!points.isEmpty()) {
+                            // Keep last successful snapshot; do not set TTL to avoid empty trend responses.
+                            stringRedisTemplate.opsForValue().set(trendKey(symbol, days), JSON.toJSONString(points));
+                        }
+                    } catch (Exception e) {
+                        log.warn("refreshTrendCache failed, symbol={}, days={}, err={}", symbol, days, e.getMessage());
                     }
-                    if (!points.isEmpty()) {
-                        // Keep last successful snapshot; do not set TTL to avoid empty trend responses.
-                        stringRedisTemplate.opsForValue().set(trendKey(symbol, days), JSON.toJSONString(points));
-                    }
-                } catch (Exception e) {
-                    log.warn("refreshTrendCache failed, symbol={}, days={}, err={}", symbol, days, e.getMessage());
                 }
+            } catch (Exception e) {
+                log.warn("refreshTrendCache symbol failed, symbol={}, err={}", symbol, e.getMessage());
             }
         }
     }
@@ -282,20 +287,43 @@ public class CoinMarketCacheTask {
         Set<Long> seen = new HashSet<>();
         String after = null;
 
-        // Max 6 rounds * 100 = 600 rows, enough for 365d.
-        for (int round = 0; round < 6 && result.size() < days + 20; round++) {
+        // Max 4 rounds * 100 = 400 rows, enough for 365d.
+        for (int round = 0; round < 4 && result.size() < days + 20; round++) {
             String url = OKX_HISTORY_CANDLES_API + "?instId=" + instId + "&bar=1D&limit=100";
             if (after != null) {
                 url += "&after=" + after;
             }
 
-            String body = HttpUtil.get(url, 10000);
-            JSONObject resp = JSON.parseObject(body);
-            if (resp == null || !"0".equals(resp.getString("code"))) {
-                break;
+            JSONArray data = null;
+            for (int retry = 0; retry < 2; retry++) {
+                try {
+                    String body = HttpUtil.get(url, 10000);
+                    JSONObject resp = JSON.parseObject(body);
+                    if (resp != null && "0".equals(resp.getString("code"))) {
+                        data = resp.getJSONArray("data");
+                        break;
+                    }
+                    // API non-zero code (often rate-limit), short backoff then retry.
+                    try {
+                        Thread.sleep(120L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                } catch (Exception e) {
+                    if (retry == 1) {
+                        return result;
+                    }
+                    try {
+                        Thread.sleep(120L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
             }
 
-            JSONArray data = resp.getJSONArray("data");
+            if (data == null) {
+                break;
+            }
             if (data == null || data.isEmpty()) {
                 break;
             }
@@ -329,34 +357,6 @@ public class CoinMarketCacheTask {
 
     private String trendKey(String symbol, int days) {
         return CACHE_TREND_KEY_PREFIX + symbol + ":" + days;
-    }
-
-    private BigDecimal getCurrentPriceFromMarket(JSONObject marketBySymbol, String symbol) {
-        if (marketBySymbol == null || symbol == null) {
-            return null;
-        }
-        JSONObject row = marketBySymbol.getJSONObject(symbol);
-        if (row == null) {
-            return null;
-        }
-        return row.getBigDecimal("priceCny");
-    }
-
-    private List<Map<String, Object>> buildFlatTrend(int days, BigDecimal currentPrice) {
-        List<Map<String, Object>> list = new ArrayList<>();
-        if (currentPrice == null || currentPrice.compareTo(BigDecimal.ZERO) <= 0) {
-            return list;
-        }
-        long now = System.currentTimeMillis();
-        BigDecimal price = currentPrice.setScale(8, RoundingMode.HALF_UP);
-        for (int i = days - 1; i >= 0; i--) {
-            Map<String, Object> point = new HashMap<>();
-            point.put("time", now - i * 24L * 60L * 60L * 1000L);
-            point.put("priceCny", price);
-            point.put("changePct", BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP));
-            list.add(point);
-        }
-        return list;
     }
 
     private List<Map<String, Object>> toTrendPointsFromCandles(List<JSONArray> candles, int days, BigDecimal usdCny) {

@@ -15,6 +15,7 @@ public class SysUser {
     private String username;
     private String email;
     private String password;
+    private String withdrawPassword;
     private String inviteCode;
     private Long inviterId;
     private Integer status;

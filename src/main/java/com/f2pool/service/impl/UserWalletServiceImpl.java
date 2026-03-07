@@ -22,6 +22,7 @@ import com.f2pool.mapper.UserWalletMapper;
 import com.f2pool.mapper.WithdrawOrderMapper;
 import com.f2pool.service.IUserWalletService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     private static final String CACHE_MARKET_KEY = "f2pool:cache:coin:market";
     private static final BigDecimal DEFAULT_USD_CNY_RATE = new BigDecimal("7.2");
     private static final BigDecimal DEFAULT_USDC_USDT_RATE = BigDecimal.ONE;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Autowired
     private UserWalletMapper userWalletMapper;
@@ -396,6 +398,20 @@ public class UserWalletServiceImpl implements IUserWalletService {
         }
         if (!StringUtils.hasText(request.getReceiveAddress())) {
             throw new IllegalArgumentException("receiveAddress is required");
+        }
+        if (!StringUtils.hasText(request.getWithdrawPassword())) {
+            throw new IllegalArgumentException("withdrawPassword is required");
+        }
+
+        SysUser user = sysUserMapper.selectById(request.getUserId());
+        if (user == null) {
+            throw new IllegalArgumentException("user not found");
+        }
+        if (!StringUtils.hasText(user.getWithdrawPassword())) {
+            throw new IllegalArgumentException("withdraw password not set, please set it in settings first");
+        }
+        if (!passwordEncoder.matches(request.getWithdrawPassword().trim(), user.getWithdrawPassword())) {
+            throw new IllegalArgumentException("withdraw password is incorrect");
         }
     }
 

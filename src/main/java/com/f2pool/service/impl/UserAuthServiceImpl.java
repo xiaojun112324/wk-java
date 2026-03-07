@@ -6,6 +6,8 @@ import com.f2pool.common.ApiException;
 import com.f2pool.common.JwtTokenUtil;
 import com.f2pool.dto.auth.LoginRequest;
 import com.f2pool.dto.auth.RegisterRequest;
+import com.f2pool.dto.auth.UpdateLoginPasswordRequest;
+import com.f2pool.dto.auth.UpdateWithdrawPasswordRequest;
 import com.f2pool.entity.SysUser;
 import com.f2pool.mapper.SysUserMapper;
 import com.f2pool.service.IUserAuthService;
@@ -119,6 +121,72 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
         return result;
     }
 
+    @Override
+    public Map<String, Object> updateLoginPassword(Long userId, UpdateLoginPasswordRequest request) {
+        SysUser user = requireActiveUser(userId);
+        if (request == null) {
+            throw new IllegalArgumentException("request body is required");
+        }
+        if (!StringUtils.hasText(request.getOldPassword())) {
+            throw new IllegalArgumentException("oldPassword is required");
+        }
+        if (!StringUtils.hasText(request.getNewPassword())) {
+            throw new IllegalArgumentException("newPassword is required");
+        }
+        if (request.getNewPassword().trim().length() < 6) {
+            throw new IllegalArgumentException("newPassword must be at least 6 characters");
+        }
+        if (!passwordEncoder.matches(request.getOldPassword().trim(), user.getPassword())) {
+            throw ApiException.badRequest("old password is incorrect");
+        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword().trim()));
+        updateById(user);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("updated", true);
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> updateWithdrawPassword(Long userId, UpdateWithdrawPasswordRequest request) {
+        SysUser user = requireActiveUser(userId);
+        if (request == null) {
+            throw new IllegalArgumentException("request body is required");
+        }
+        if (!StringUtils.hasText(request.getNewPassword())) {
+            throw new IllegalArgumentException("newPassword is required");
+        }
+        if (request.getNewPassword().trim().length() < 6) {
+            throw new IllegalArgumentException("newPassword must be at least 6 characters");
+        }
+
+        boolean hasOld = StringUtils.hasText(user.getWithdrawPassword());
+        if (hasOld) {
+            if (!StringUtils.hasText(request.getOldPassword())) {
+                throw new IllegalArgumentException("oldPassword is required");
+            }
+            if (!passwordEncoder.matches(request.getOldPassword().trim(), user.getWithdrawPassword())) {
+                throw ApiException.badRequest("old withdraw password is incorrect");
+            }
+        }
+
+        user.setWithdrawPassword(passwordEncoder.encode(request.getNewPassword().trim()));
+        updateById(user);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("updated", true);
+        result.put("hasWithdrawPassword", true);
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> getWithdrawPasswordStatus(Long userId) {
+        SysUser user = requireActiveUser(userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("hasWithdrawPassword", StringUtils.hasText(user.getWithdrawPassword()));
+        return result;
+    }
+
     private Map<String, Object> buildUserInfo(SysUser user) {
         Map<String, Object> info = new HashMap<>();
         info.put("id", user.getId());
@@ -127,7 +195,22 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
         info.put("inviteCode", user.getInviteCode());
         info.put("inviterId", user.getInviterId());
         info.put("status", user.getStatus());
+        info.put("hasWithdrawPassword", StringUtils.hasText(user.getWithdrawPassword()));
         return info;
+    }
+
+    private SysUser requireActiveUser(Long userId) {
+        if (userId == null) {
+            throw ApiException.unauthorized("invalid token: uid missing");
+        }
+        SysUser user = getById(userId);
+        if (user == null) {
+            throw ApiException.notFound("user not found");
+        }
+        if (user.getStatus() == null || user.getStatus() != 1) {
+            throw ApiException.forbidden("account is disabled");
+        }
+        return user;
     }
 
     private String generateInviteCode() {

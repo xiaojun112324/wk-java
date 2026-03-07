@@ -102,6 +102,9 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         validateBuyByPRequest(request);
 
         String symbol = request.getCoinSymbol().trim().toUpperCase();
+        if (!"BTC".equals(symbol)) {
+            throw new IllegalArgumentException("暂未开通此矿池");
+        }
         BigDecimal pricePerPUsd = getConfigDecimal(PRICE_PER_P_USD_KEY);
         if (pricePerPUsd.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("sys_config machine_price_per_p_usd must be greater than 0");

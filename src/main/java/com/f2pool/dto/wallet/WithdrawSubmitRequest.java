@@ -12,4 +12,5 @@ public class WithdrawSubmitRequest {
     private BigDecimal amount;
     private BigDecimal amountCny;
     private String receiveAddress;
+    private String withdrawPassword;
 }

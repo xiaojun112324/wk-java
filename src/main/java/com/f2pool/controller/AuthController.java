@@ -3,8 +3,11 @@ package com.f2pool.controller;
 import com.f2pool.common.ApiException;
 import com.f2pool.common.JwtTokenUtil;
 import com.f2pool.common.R;
+import com.f2pool.common.TokenContextUtil;
 import com.f2pool.dto.auth.LoginRequest;
 import com.f2pool.dto.auth.RegisterRequest;
+import com.f2pool.dto.auth.UpdateLoginPasswordRequest;
+import com.f2pool.dto.auth.UpdateWithdrawPasswordRequest;
 import com.f2pool.entity.SysUser;
 import com.f2pool.mapper.SysUserMapper;
 import com.f2pool.service.IUserAuthService;
@@ -33,6 +36,8 @@ public class AuthController {
     private JwtTokenUtil jwtTokenUtil;
     @Autowired
     private SysUserMapper sysUserMapper;
+    @Autowired
+    private TokenContextUtil tokenContextUtil;
 
     @ApiOperation("用户注册（账号/邮箱/密码，可选邀请码）")
     @PostMapping("/register")
@@ -67,9 +72,41 @@ public class AuthController {
         data.put("inviteCode", user.getInviteCode());
         data.put("inviterId", user.getInviterId());
         data.put("status", user.getStatus());
+        data.put("hasWithdrawPassword", user.getWithdrawPassword() != null && !user.getWithdrawPassword().isBlank());
         data.put("role", claims.get("role"));
         data.put("subject", claims.getSubject());
         data.put("expireAt", claims.getExpiration());
+        return R.ok(data);
+    }
+
+    @ApiOperation("修改登录密码")
+    @PostMapping("/password/login/update")
+    public R<Map<String, Object>> updateLoginPassword(@RequestHeader("Authorization") String authorization,
+                                                       @RequestBody UpdateLoginPasswordRequest request) {
+        Long userId = tokenContextUtil.requireUserId(authorization);
+        return R.ok(userAuthService.updateLoginPassword(userId, request));
+    }
+
+    @ApiOperation("设置/修改提现密码")
+    @PostMapping("/password/withdraw/update")
+    public R<Map<String, Object>> updateWithdrawPassword(@RequestHeader("Authorization") String authorization,
+                                                          @RequestBody UpdateWithdrawPasswordRequest request) {
+        Long userId = tokenContextUtil.requireUserId(authorization);
+        return R.ok(userAuthService.updateWithdrawPassword(userId, request));
+    }
+
+    @ApiOperation("提现密码设置状态")
+    @GetMapping("/password/withdraw/status")
+    public R<Map<String, Object>> withdrawPasswordStatus(@RequestHeader("Authorization") String authorization) {
+        Long userId = tokenContextUtil.requireUserId(authorization);
+        return R.ok(userAuthService.getWithdrawPasswordStatus(userId));
+    }
+
+    @ApiOperation("用户退出登录")
+    @PostMapping("/logout")
+    public R<Map<String, Object>> logout() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("loggedOut", true);
         return R.ok(data);
     }
 }
