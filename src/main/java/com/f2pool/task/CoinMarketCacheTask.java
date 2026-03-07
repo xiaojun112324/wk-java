@@ -29,6 +29,7 @@ public class CoinMarketCacheTask {
     private static final String CACHE_MARKET_KEY = "f2pool:cache:coin:market";
     private static final String CACHE_TREND_KEY_PREFIX = "f2pool:cache:coin:trend:";
     private static final String CACHE_USD_CNY_KEY = "f2pool:cache:fx:usd_cny";
+    private static final String CACHE_USDC_USDT_KEY = "f2pool:cache:fx:usdc_usdt";
     private static final BigDecimal MIN_USD_CNY = new BigDecimal("5");
     private static final BigDecimal MAX_USD_CNY = new BigDecimal("10");
     private static final BigDecimal PRICE_JUMP_LIMIT = new BigDecimal("0.20");
@@ -140,6 +141,7 @@ public class CoinMarketCacheTask {
             JSONObject row = data.getJSONObject(i);
             byInstId.put(row.getString("instId"), row);
         }
+        cacheUsdcUsdtRate(byInstId);
 
         JSONObject marketBySymbol = new JSONObject();
         for (Map.Entry<String, String> entry : OKX_INST_ID_MAP.entrySet()) {
@@ -183,6 +185,22 @@ public class CoinMarketCacheTask {
             marketBySymbol.put(symbol, item);
         }
         return marketBySymbol;
+    }
+
+    private void cacheUsdcUsdtRate(Map<String, JSONObject> byInstId) {
+        try {
+            JSONObject usdcTicker = byInstId.get("USDC-USDT");
+            if (usdcTicker == null) {
+                return;
+            }
+            BigDecimal usdcUsdt = usdcTicker.getBigDecimal("last");
+            if (usdcUsdt != null
+                    && usdcUsdt.compareTo(new BigDecimal("0.5")) > 0
+                    && usdcUsdt.compareTo(new BigDecimal("1.5")) < 0) {
+                stringRedisTemplate.opsForValue().set(CACHE_USDC_USDT_KEY, usdcUsdt.toPlainString());
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private BigDecimal getUsdCnyRate() {

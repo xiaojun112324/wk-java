@@ -1,6 +1,8 @@
 package com.f2pool.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import com.f2pool.dto.wallet.AuditRequest;
 import com.f2pool.dto.wallet.RechargeSubmitRequest;
 import com.f2pool.dto.wallet.WithdrawSubmitRequest;
@@ -11,13 +13,16 @@ import com.f2pool.entity.SysUser;
 import com.f2pool.entity.UserWallet;
 import com.f2pool.entity.WithdrawOrder;
 import com.f2pool.mapper.InviteRebateOrderMapper;
+import com.f2pool.mapper.MiningCoinMapper;
 import com.f2pool.mapper.RechargeOrderMapper;
 import com.f2pool.mapper.SysConfigMapper;
 import com.f2pool.mapper.SysUserMapper;
+import com.f2pool.mapper.UserMachineOrderMapper;
 import com.f2pool.mapper.UserWalletMapper;
 import com.f2pool.mapper.WithdrawOrderMapper;
 import com.f2pool.service.IUserWalletService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -31,6 +36,11 @@ import java.util.stream.Collectors;
 public class UserWalletServiceImpl implements IUserWalletService {
     private static final String LEVEL1_RATE_KEY = "invite_rebate_level1_rate";
     private static final String LEVEL2_RATE_KEY = "invite_rebate_level2_rate";
+    private static final String CACHE_USD_CNY_KEY = "f2pool:cache:fx:usd_cny";
+    private static final String CACHE_USDC_USDT_KEY = "f2pool:cache:fx:usdc_usdt";
+    private static final String CACHE_MARKET_KEY = "f2pool:cache:coin:market";
+    private static final BigDecimal DEFAULT_USD_CNY_RATE = new BigDecimal("7.2");
+    private static final BigDecimal DEFAULT_USDC_USDT_RATE = BigDecimal.ONE;
 
     @Autowired
     private UserWalletMapper userWalletMapper;
@@ -44,6 +54,12 @@ public class UserWalletServiceImpl implements IUserWalletService {
     private SysUserMapper sysUserMapper;
     @Autowired
     private InviteRebateOrderMapper inviteRebateOrderMapper;
+    @Autowired
+    private UserMachineOrderMapper userMachineOrderMapper;
+    @Autowired
+    private MiningCoinMapper miningCoinMapper;
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Map<String, Object> getWallet(Long userId) {
@@ -59,7 +75,6 @@ public class UserWalletServiceImpl implements IUserWalletService {
         Map<String, Object> map = new HashMap<>();
         map.put("USDT_TRC20", getConfig("recharge_usdt_trc20_address"));
         map.put("USDT_ERC20", getConfig("recharge_usdt_erc20_address"));
-        map.put("USDC_TRC20", getConfig("recharge_usdc_trc20_address"));
         map.put("USDC_ERC20", getConfig("recharge_usdc_erc20_address"));
         return map;
     }
@@ -72,7 +87,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
         order.setUserId(request.getUserId());
         order.setAsset(request.getAsset().trim().toUpperCase());
         order.setNetwork(request.getNetwork().trim().toUpperCase());
-        order.setAmountCny(request.getAmountCny());
+        order.setAmount(resolveAmount(request.getAmount(), request.getAmountCny()));
         order.setVoucherImage(request.getVoucherImage().trim());
         order.setStatus(0);
         rechargeOrderMapper.insert(order);
@@ -83,19 +98,21 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Transactional
     public Map<String, Object> submitWithdraw(WithdrawSubmitRequest request) {
         validateWithdrawRequest(request);
+        String asset = normalizeAsset(request.getAsset());
+        BigDecimal amount = resolveAmount(request.getAmount(), request.getAmountCny());
         UserWallet wallet = getOrCreateWallet(request.getUserId());
-        if (wallet.getBalanceCny().compareTo(request.getAmountCny()) < 0) {
+        if (getBalanceByAsset(wallet, asset).compareTo(amount) < 0) {
             throw new IllegalArgumentException("insufficient balance");
         }
-        wallet.setBalanceCny(wallet.getBalanceCny().subtract(request.getAmountCny()));
-        wallet.setFreezeCny(wallet.getFreezeCny().add(request.getAmountCny()));
+        setBalanceByAsset(wallet, asset, getBalanceByAsset(wallet, asset).subtract(amount));
+        setFreezeByAsset(wallet, asset, getFreezeByAsset(wallet, asset).add(amount));
         userWalletMapper.updateById(wallet);
 
         WithdrawOrder order = new WithdrawOrder();
         order.setUserId(request.getUserId());
-        order.setAsset(request.getAsset().trim().toUpperCase());
+        order.setAsset(asset);
         order.setNetwork(request.getNetwork().trim().toUpperCase());
-        order.setAmountCny(request.getAmountCny());
+        order.setAmount(amount);
         order.setReceiveAddress(request.getReceiveAddress().trim());
         order.setStatus(0);
         withdrawOrderMapper.insert(order);
@@ -166,8 +183,9 @@ public class UserWalletServiceImpl implements IUserWalletService {
 
         if (request.getStatus() == 1) {
             UserWallet wallet = getOrCreateWallet(order.getUserId());
-            wallet.setBalanceCny(wallet.getBalanceCny().add(order.getAmountCny()));
-            wallet.setTotalRechargeCny(wallet.getTotalRechargeCny().add(order.getAmountCny()));
+            String asset = normalizeAsset(order.getAsset());
+            setBalanceByAsset(wallet, asset, getBalanceByAsset(wallet, asset).add(order.getAmount()));
+            setTotalRechargeByAsset(wallet, asset, getTotalRechargeByAsset(wallet, asset).add(order.getAmount()));
             userWalletMapper.updateById(wallet);
             processInviteRebate(order);
         }
@@ -191,12 +209,13 @@ public class UserWalletServiceImpl implements IUserWalletService {
         withdrawOrderMapper.updateById(order);
 
         UserWallet wallet = getOrCreateWallet(order.getUserId());
+        String asset = normalizeAsset(order.getAsset());
         if (request.getStatus() == 1) {
-            wallet.setFreezeCny(wallet.getFreezeCny().subtract(order.getAmountCny()));
-            wallet.setTotalWithdrawCny(wallet.getTotalWithdrawCny().add(order.getAmountCny()));
+            setFreezeByAsset(wallet, asset, getFreezeByAsset(wallet, asset).subtract(order.getAmount()));
+            setTotalWithdrawByAsset(wallet, asset, getTotalWithdrawByAsset(wallet, asset).add(order.getAmount()));
         } else {
-            wallet.setFreezeCny(wallet.getFreezeCny().subtract(order.getAmountCny()));
-            wallet.setBalanceCny(wallet.getBalanceCny().add(order.getAmountCny()));
+            setFreezeByAsset(wallet, asset, getFreezeByAsset(wallet, asset).subtract(order.getAmount()));
+            setBalanceByAsset(wallet, asset, getBalanceByAsset(wallet, asset).add(order.getAmount()));
         }
         userWalletMapper.updateById(wallet);
         return buildWithdraw(order);
@@ -204,26 +223,28 @@ public class UserWalletServiceImpl implements IUserWalletService {
 
     @Override
     @Transactional
-    public void decreaseBalance(Long userId, BigDecimal amount) {
+    public void decreaseBalance(Long userId, String asset, BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("amount must be greater than 0");
         }
         UserWallet wallet = getOrCreateWallet(userId);
-        if (wallet.getBalanceCny().compareTo(amount) < 0) {
+        String normalizedAsset = normalizeAsset(asset);
+        if (getBalanceByAsset(wallet, normalizedAsset).compareTo(amount) < 0) {
             throw new IllegalArgumentException("insufficient balance");
         }
-        wallet.setBalanceCny(wallet.getBalanceCny().subtract(amount));
+        setBalanceByAsset(wallet, normalizedAsset, getBalanceByAsset(wallet, normalizedAsset).subtract(amount));
         userWalletMapper.updateById(wallet);
     }
 
     @Override
     @Transactional
-    public void increaseBalance(Long userId, BigDecimal amount) {
+    public void increaseBalance(Long userId, String asset, BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("amount must be greater than 0");
         }
         UserWallet wallet = getOrCreateWallet(userId);
-        wallet.setBalanceCny(wallet.getBalanceCny().add(amount));
+        String normalizedAsset = normalizeAsset(asset);
+        setBalanceByAsset(wallet, normalizedAsset, getBalanceByAsset(wallet, normalizedAsset).add(amount));
         userWalletMapper.updateById(wallet);
     }
 
@@ -356,8 +377,9 @@ public class UserWalletServiceImpl implements IUserWalletService {
         if (request == null) throw new IllegalArgumentException("request body is required");
         if (request.getUserId() == null) throw new IllegalArgumentException("userId is required");
         validateAssetNetwork(request.getAsset(), request.getNetwork());
-        if (request.getAmountCny() == null || request.getAmountCny().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("amountCny must be greater than 0");
+        BigDecimal amount = resolveAmount(request.getAmount(), request.getAmountCny());
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("amount must be greater than 0");
         }
         if (!StringUtils.hasText(request.getVoucherImage())) {
             throw new IllegalArgumentException("voucherImage is required");
@@ -368,8 +390,9 @@ public class UserWalletServiceImpl implements IUserWalletService {
         if (request == null) throw new IllegalArgumentException("request body is required");
         if (request.getUserId() == null) throw new IllegalArgumentException("userId is required");
         validateAssetNetwork(request.getAsset(), request.getNetwork());
-        if (request.getAmountCny() == null || request.getAmountCny().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("amountCny must be greater than 0");
+        BigDecimal amount = resolveAmount(request.getAmount(), request.getAmountCny());
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("amount must be greater than 0");
         }
         if (!StringUtils.hasText(request.getReceiveAddress())) {
             throw new IllegalArgumentException("receiveAddress is required");
@@ -382,10 +405,11 @@ public class UserWalletServiceImpl implements IUserWalletService {
         }
         String a = asset.trim().toUpperCase();
         String n = network.trim().toUpperCase();
-        boolean assetOk = "USDT".equals(a) || "USDC".equals(a);
-        boolean netOk = "TRC20".equals(n) || "ERC20".equals(n);
-        if (!assetOk || !netOk) {
-            throw new IllegalArgumentException("only USDT/USDC and TRC20/ERC20 are supported");
+        boolean valid = ("USDT".equals(a) && ("TRC20".equals(n) || "ERC20".equals(n)))
+                || ("USDC".equals(a) && "ERC20".equals(n))
+                || ("BTC".equals(a) && "BTC".equals(n));
+        if (!valid) {
+            throw new IllegalArgumentException("invalid asset/network pair");
         }
     }
 
@@ -418,30 +442,140 @@ public class UserWalletServiceImpl implements IUserWalletService {
     private UserWallet getOrCreateWallet(Long userId) {
         UserWallet wallet = userWalletMapper.selectOne(new QueryWrapper<UserWallet>().eq("user_id", userId));
         if (wallet != null) {
-            if (wallet.getBalanceCny() == null) wallet.setBalanceCny(BigDecimal.ZERO);
-            if (wallet.getFreezeCny() == null) wallet.setFreezeCny(BigDecimal.ZERO);
-            if (wallet.getTotalRechargeCny() == null) wallet.setTotalRechargeCny(BigDecimal.ZERO);
-            if (wallet.getTotalWithdrawCny() == null) wallet.setTotalWithdrawCny(BigDecimal.ZERO);
+            normalizeWallet(wallet);
             return wallet;
         }
         wallet = new UserWallet();
         wallet.setUserId(userId);
-        wallet.setBalanceCny(BigDecimal.ZERO);
-        wallet.setFreezeCny(BigDecimal.ZERO);
-        wallet.setTotalRechargeCny(BigDecimal.ZERO);
-        wallet.setTotalWithdrawCny(BigDecimal.ZERO);
+        normalizeWallet(wallet);
         userWalletMapper.insert(wallet);
         return wallet;
     }
 
     private Map<String, Object> buildWallet(UserWallet wallet) {
+        BigDecimal usdtRate = getUsdCnyRateFromCache();
+        BigDecimal usdcRate = getUsdcCnyRateFromCache(usdtRate);
+        BigDecimal btcRate = getBtcCnyPriceFromCache();
+        BigDecimal machineBalanceUsdt = getMachineBalanceUsdt(wallet.getUserId());
+
+        BigDecimal totalAssetCny = safe(wallet.getUsdtBalance()).multiply(usdtRate)
+                .add(safe(wallet.getUsdcBalance()).multiply(usdcRate))
+                .add(safe(wallet.getBtcBalance()).multiply(btcRate))
+                .add(machineBalanceUsdt.multiply(usdtRate))
+                .setScale(8, RoundingMode.HALF_UP);
+
         Map<String, Object> map = new HashMap<>();
         map.put("userId", wallet.getUserId());
-        map.put("balanceCny", wallet.getBalanceCny());
-        map.put("freezeCny", wallet.getFreezeCny());
-        map.put("totalRechargeCny", wallet.getTotalRechargeCny());
-        map.put("totalWithdrawCny", wallet.getTotalWithdrawCny());
+        map.put("usdtBalance", wallet.getUsdtBalance());
+        map.put("usdcBalance", wallet.getUsdcBalance());
+        map.put("btcBalance", wallet.getBtcBalance());
+        map.put("machineBalanceUsdt", machineBalanceUsdt);
+        map.put("usdtFreeze", wallet.getUsdtFreeze());
+        map.put("usdcFreeze", wallet.getUsdcFreeze());
+        map.put("btcFreeze", wallet.getBtcFreeze());
+        map.put("totalRechargeUsdt", wallet.getTotalRechargeUsdt());
+        map.put("totalRechargeUsdc", wallet.getTotalRechargeUsdc());
+        map.put("totalRechargeBtc", wallet.getTotalRechargeBtc());
+        map.put("totalWithdrawUsdt", wallet.getTotalWithdrawUsdt());
+        map.put("totalWithdrawUsdc", wallet.getTotalWithdrawUsdc());
+        map.put("totalWithdrawBtc", wallet.getTotalWithdrawBtc());
+        map.put("totalAssetCny", totalAssetCny);
+        Map<String, Object> exchangeRates = new HashMap<>();
+        exchangeRates.put("USDT_CNY", usdtRate);
+        exchangeRates.put("USDC_CNY", usdcRate);
+        exchangeRates.put("BTC_CNY", btcRate);
+        map.put("exchangeRates", exchangeRates);
         return map;
+    }
+
+    private BigDecimal getMachineBalanceUsdt(Long userId) {
+        if (userId == null) {
+            return BigDecimal.ZERO;
+        }
+        List<com.f2pool.entity.UserMachineOrder> holdingOrders = userMachineOrderMapper.selectList(
+                new QueryWrapper<com.f2pool.entity.UserMachineOrder>()
+                        .eq("user_id", userId)
+                        .eq("status", 1)
+        );
+        BigDecimal sum = BigDecimal.ZERO;
+        for (com.f2pool.entity.UserMachineOrder order : holdingOrders) {
+            sum = sum.add(safe(order.getTotalInvest()));
+        }
+        return sum.setScale(8, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal getUsdCnyRateFromCache() {
+        try {
+            String value = stringRedisTemplate.opsForValue().get(CACHE_USD_CNY_KEY);
+            if (StringUtils.hasText(value)) {
+                BigDecimal rate = new BigDecimal(value.trim());
+                if (rate.compareTo(new BigDecimal("5")) >= 0 && rate.compareTo(new BigDecimal("10")) <= 0) {
+                    return rate;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return DEFAULT_USD_CNY_RATE;
+    }
+
+    private BigDecimal getUsdcCnyRateFromCache(BigDecimal usdtCny) {
+        BigDecimal usdcUsdt = DEFAULT_USDC_USDT_RATE;
+        try {
+            String value = stringRedisTemplate.opsForValue().get(CACHE_USDC_USDT_KEY);
+            if (StringUtils.hasText(value)) {
+                BigDecimal rate = new BigDecimal(value.trim());
+                if (rate.compareTo(new BigDecimal("0.5")) > 0 && rate.compareTo(new BigDecimal("1.5")) < 0) {
+                    usdcUsdt = rate;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return usdtCny.multiply(usdcUsdt).setScale(8, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal getBtcCnyPriceFromCache() {
+        try {
+            String marketJson = stringRedisTemplate.opsForValue().get(CACHE_MARKET_KEY);
+            if (StringUtils.hasText(marketJson)) {
+                JSONObject all = JSON.parseObject(marketJson);
+                if (all != null) {
+                    JSONObject btc = all.getJSONObject("BTC");
+                    if (btc != null) {
+                        BigDecimal price = btc.getBigDecimal("priceCny");
+                        if (price != null && price.compareTo(BigDecimal.ZERO) > 0) {
+                            return price;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        // DB fallback
+        try {
+            com.f2pool.entity.MiningCoin btcCoin = miningCoinMapper.selectOne(new QueryWrapper<com.f2pool.entity.MiningCoin>()
+                    .eq("symbol", "BTC")
+                    .last("limit 1"));
+            if (btcCoin != null && btcCoin.getPriceCny() != null && btcCoin.getPriceCny().compareTo(BigDecimal.ZERO) > 0) {
+                return btcCoin.getPriceCny();
+            }
+        } catch (Exception ignored) {
+        }
+        // Optional manual fallback from config
+        SysConfig cfg = sysConfigMapper.selectOne(new QueryWrapper<SysConfig>()
+                .eq("config_key", "wallet_btc_cny_rate")
+                .eq("status", 1)
+                .last("limit 1"));
+        if (cfg != null && StringUtils.hasText(cfg.getConfigValue())) {
+            try {
+                return new BigDecimal(cfg.getConfigValue().trim());
+            } catch (Exception ignored) {
+            }
+        }
+        return BigDecimal.ZERO;
+    }
+
+    private BigDecimal safe(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     private Map<String, Object> buildRecharge(RechargeOrder order) {
@@ -450,7 +584,8 @@ public class UserWalletServiceImpl implements IUserWalletService {
         map.put("userId", order.getUserId());
         map.put("asset", order.getAsset());
         map.put("network", order.getNetwork());
-        map.put("amountCny", order.getAmountCny());
+        map.put("amount", order.getAmount());
+        map.put("amountCny", order.getAmount());
         map.put("voucherImage", order.getVoucherImage());
         map.put("status", order.getStatus());
         map.put("auditRemark", order.getAuditRemark());
@@ -477,7 +612,8 @@ public class UserWalletServiceImpl implements IUserWalletService {
         map.put("userId", order.getUserId());
         map.put("asset", order.getAsset());
         map.put("network", order.getNetwork());
-        map.put("amountCny", order.getAmountCny());
+        map.put("amount", order.getAmount());
+        map.put("amountCny", order.getAmount());
         map.put("receiveAddress", order.getReceiveAddress());
         map.put("status", order.getStatus());
         map.put("auditRemark", order.getAuditRemark());
@@ -487,7 +623,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     }
 
     private void processInviteRebate(RechargeOrder order) {
-        if (order == null || order.getId() == null || order.getUserId() == null || order.getAmountCny() == null) {
+        if (order == null || order.getId() == null || order.getUserId() == null || order.getAmount() == null) {
             return;
         }
         SysUser sourceUser = sysUserMapper.selectById(order.getUserId());
@@ -523,15 +659,20 @@ public class UserWalletServiceImpl implements IUserWalletService {
             return;
         }
 
-        BigDecimal rebateAmount = order.getAmountCny()
+        BigDecimal rebateAmount = order.getAmount()
                 .multiply(rate)
                 .setScale(8, RoundingMode.HALF_UP);
         if (rebateAmount.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
 
+        String rebateAsset = "USDT".equals(normalizeAsset(order.getAsset())) ? "USDT" : "USDC";
         UserWallet beneficiaryWallet = getOrCreateWallet(beneficiaryUserId);
-        beneficiaryWallet.setBalanceCny(beneficiaryWallet.getBalanceCny().add(rebateAmount));
+        setBalanceByAsset(
+                beneficiaryWallet,
+                rebateAsset,
+                getBalanceByAsset(beneficiaryWallet, rebateAsset).add(rebateAmount)
+        );
         userWalletMapper.updateById(beneficiaryWallet);
 
         InviteRebateOrder rebateOrder = new InviteRebateOrder();
@@ -539,9 +680,111 @@ public class UserWalletServiceImpl implements IUserWalletService {
         rebateOrder.setSourceUserId(sourceUserId);
         rebateOrder.setRechargeOrderId(order.getId());
         rebateOrder.setLevel(level);
-        rebateOrder.setSourceRechargeAmountCny(order.getAmountCny());
+        rebateOrder.setSourceRechargeAmountCny(order.getAmount());
         rebateOrder.setRebateRate(rate);
         rebateOrder.setRebateAmountCny(rebateAmount);
         inviteRebateOrderMapper.insert(rebateOrder);
+    }
+
+    private void normalizeWallet(UserWallet wallet) {
+        if (wallet.getUsdtBalance() == null) wallet.setUsdtBalance(BigDecimal.ZERO);
+        if (wallet.getUsdcBalance() == null) wallet.setUsdcBalance(BigDecimal.ZERO);
+        if (wallet.getBtcBalance() == null) wallet.setBtcBalance(BigDecimal.ZERO);
+        if (wallet.getUsdtFreeze() == null) wallet.setUsdtFreeze(BigDecimal.ZERO);
+        if (wallet.getUsdcFreeze() == null) wallet.setUsdcFreeze(BigDecimal.ZERO);
+        if (wallet.getBtcFreeze() == null) wallet.setBtcFreeze(BigDecimal.ZERO);
+        if (wallet.getTotalRechargeUsdt() == null) wallet.setTotalRechargeUsdt(BigDecimal.ZERO);
+        if (wallet.getTotalRechargeUsdc() == null) wallet.setTotalRechargeUsdc(BigDecimal.ZERO);
+        if (wallet.getTotalRechargeBtc() == null) wallet.setTotalRechargeBtc(BigDecimal.ZERO);
+        if (wallet.getTotalWithdrawUsdt() == null) wallet.setTotalWithdrawUsdt(BigDecimal.ZERO);
+        if (wallet.getTotalWithdrawUsdc() == null) wallet.setTotalWithdrawUsdc(BigDecimal.ZERO);
+        if (wallet.getTotalWithdrawBtc() == null) wallet.setTotalWithdrawBtc(BigDecimal.ZERO);
+    }
+
+    private String normalizeAsset(String asset) {
+        if (!StringUtils.hasText(asset)) {
+            throw new IllegalArgumentException("asset is required");
+        }
+        String normalized = asset.trim().toUpperCase();
+        if (!"USDT".equals(normalized) && !"USDC".equals(normalized) && !"BTC".equals(normalized)) {
+            throw new IllegalArgumentException("asset must be one of USDT/USDC/BTC");
+        }
+        return normalized;
+    }
+
+    private BigDecimal getBalanceByAsset(UserWallet wallet, String asset) {
+        String a = normalizeAsset(asset);
+        if ("USDT".equals(a)) return wallet.getUsdtBalance();
+        if ("USDC".equals(a)) return wallet.getUsdcBalance();
+        return wallet.getBtcBalance();
+    }
+
+    private void setBalanceByAsset(UserWallet wallet, String asset, BigDecimal value) {
+        String a = normalizeAsset(asset);
+        if ("USDT".equals(a)) {
+            wallet.setUsdtBalance(value);
+        } else if ("USDC".equals(a)) {
+            wallet.setUsdcBalance(value);
+        } else {
+            wallet.setBtcBalance(value);
+        }
+    }
+
+    private BigDecimal getFreezeByAsset(UserWallet wallet, String asset) {
+        String a = normalizeAsset(asset);
+        if ("USDT".equals(a)) return wallet.getUsdtFreeze();
+        if ("USDC".equals(a)) return wallet.getUsdcFreeze();
+        return wallet.getBtcFreeze();
+    }
+
+    private void setFreezeByAsset(UserWallet wallet, String asset, BigDecimal value) {
+        String a = normalizeAsset(asset);
+        if ("USDT".equals(a)) {
+            wallet.setUsdtFreeze(value);
+        } else if ("USDC".equals(a)) {
+            wallet.setUsdcFreeze(value);
+        } else {
+            wallet.setBtcFreeze(value);
+        }
+    }
+
+    private BigDecimal getTotalRechargeByAsset(UserWallet wallet, String asset) {
+        String a = normalizeAsset(asset);
+        if ("USDT".equals(a)) return wallet.getTotalRechargeUsdt();
+        if ("USDC".equals(a)) return wallet.getTotalRechargeUsdc();
+        return wallet.getTotalRechargeBtc();
+    }
+
+    private void setTotalRechargeByAsset(UserWallet wallet, String asset, BigDecimal value) {
+        String a = normalizeAsset(asset);
+        if ("USDT".equals(a)) {
+            wallet.setTotalRechargeUsdt(value);
+        } else if ("USDC".equals(a)) {
+            wallet.setTotalRechargeUsdc(value);
+        } else {
+            wallet.setTotalRechargeBtc(value);
+        }
+    }
+
+    private BigDecimal getTotalWithdrawByAsset(UserWallet wallet, String asset) {
+        String a = normalizeAsset(asset);
+        if ("USDT".equals(a)) return wallet.getTotalWithdrawUsdt();
+        if ("USDC".equals(a)) return wallet.getTotalWithdrawUsdc();
+        return wallet.getTotalWithdrawBtc();
+    }
+
+    private void setTotalWithdrawByAsset(UserWallet wallet, String asset, BigDecimal value) {
+        String a = normalizeAsset(asset);
+        if ("USDT".equals(a)) {
+            wallet.setTotalWithdrawUsdt(value);
+        } else if ("USDC".equals(a)) {
+            wallet.setTotalWithdrawUsdc(value);
+        } else {
+            wallet.setTotalWithdrawBtc(value);
+        }
+    }
+
+    private BigDecimal resolveAmount(BigDecimal amount, BigDecimal amountCny) {
+        return amount != null ? amount : amountCny;
     }
 }

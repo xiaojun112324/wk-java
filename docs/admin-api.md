@@ -337,3 +337,35 @@ true
 - `recharge_*` 收款地址类配置禁止接口修改（仅数据库可改）。
 
 
+
+## 客服聊天管理
+
+### 会话列表
+- Method: `GET`
+- Path: `/api/admin/chat/rooms`
+- Query: `keyword`(选填，支持账号/邮箱/邀请码模糊搜索)
+
+### 拉取会话消息
+- Method: `GET`
+- Path: `/api/admin/chat/messages`
+- Query: `roomId`(必填), `afterId`(选填), `limit`(选填)
+
+### 发送消息（文本/图片）
+- Method: `POST`
+- Path: `/api/admin/chat/send`
+
+```json
+{
+  "roomId": 1,
+  "messageType": 1,
+  "messageContent": "您好，这里是在线客服"
+}
+```
+
+### 标记已读
+- Method: `POST`
+- Path: `/api/admin/chat/read?roomId=1`
+
+### 图片发送流程
+1. 先调用 `POST /api/admin/file/upload` 上传图片，获取 `url`
+2. 再调用 `/api/admin/chat/send`，`messageType=2`，`messageContent` 传图片 `url`

@@ -29,9 +29,9 @@ public interface IUserWalletService {
 
     Map<String, Object> auditWithdraw(Long id, AuditRequest request);
 
-    void decreaseBalance(Long userId, BigDecimal amount);
+    void decreaseBalance(Long userId, String asset, BigDecimal amount);
 
-    void increaseBalance(Long userId, BigDecimal amount);
+    void increaseBalance(Long userId, String asset, BigDecimal amount);
 
     Map<String, Object> getInviteSummary(Long userId);
 

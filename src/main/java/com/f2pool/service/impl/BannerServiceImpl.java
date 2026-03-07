@@ -15,7 +15,7 @@ public class BannerServiceImpl extends ServiceImpl<BannerMapper, Banner> impleme
     public Banner create(BannerSaveRequest request) {
         validateRequest(request);
         Banner banner = new Banner();
-        banner.setImage(request.getImage().trim());
+        banner.setImage(normalizeImagePath(request.getImage()));
         save(banner);
         return banner;
     }
@@ -30,7 +30,7 @@ public class BannerServiceImpl extends ServiceImpl<BannerMapper, Banner> impleme
         if (banner == null) {
             throw new IllegalArgumentException("banner not found");
         }
-        banner.setImage(request.getImage().trim());
+        banner.setImage(normalizeImagePath(request.getImage()));
         updateById(banner);
         return banner;
     }
@@ -42,5 +42,23 @@ public class BannerServiceImpl extends ServiceImpl<BannerMapper, Banner> impleme
         if (!StringUtils.hasText(request.getImage())) {
             throw new IllegalArgumentException("image is required");
         }
+    }
+
+    private String normalizeImagePath(String raw) {
+        String image = raw == null ? "" : raw.trim();
+
+        int idx = image.indexOf("/file/");
+        if (idx >= 0) {
+            image = image.substring(idx);
+        }
+
+        image = image.replace("\\", "/");
+        image = image.replace("/www/wwwroot", "");
+
+        if (image.startsWith("file/")) {
+            image = "/" + image;
+        }
+
+        return image;
     }
 }

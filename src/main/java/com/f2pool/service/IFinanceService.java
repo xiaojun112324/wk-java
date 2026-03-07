@@ -8,5 +8,5 @@ import java.util.Map;
 
 public interface IFinanceService extends IService<FinanceAccount> {
     FinanceAccount getUserAccount(Long userId, String coinSymbol);
-    List<FinanceBill> getBillHistory(Long userId, String coinSymbol, int type);
+    List<FinanceBill> getBillHistory(Long userId, String coinSymbol, Integer type);
 }

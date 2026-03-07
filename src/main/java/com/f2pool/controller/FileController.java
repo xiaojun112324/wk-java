@@ -20,10 +20,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-@Api(tags = "管理端文件接口")
+@Api(tags = "文件上传接口")
 @RestController
-@RequestMapping("/api/admin/file")
-public class AdminFileController {
+@RequestMapping("/api/file")
+public class FileController {
 
     private static final String UPLOAD_DIR = "/www/wwwroot/file";
     private static final String WEB_FILE_PREFIX = "/file/";
@@ -31,7 +31,7 @@ public class AdminFileController {
     @Value("${app.image-domain:https://api.kuaiyi.info}")
     private String imageDomain;
 
-    @ApiOperation("上传文件到 /www/wwwroot/file")
+    @ApiOperation("上传文件")
     @PostMapping("/upload")
     public R<Map<String, Object>> upload(@RequestParam("file") MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {

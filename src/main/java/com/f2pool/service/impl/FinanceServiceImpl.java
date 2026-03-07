@@ -26,11 +26,11 @@ public class FinanceServiceImpl extends ServiceImpl<FinanceAccountMapper, Financ
     }
 
     @Override
-    public List<FinanceBill> getBillHistory(Long userId, String coinSymbol, int type) {
+    public List<FinanceBill> getBillHistory(Long userId, String coinSymbol, Integer type) {
         QueryWrapper<FinanceBill> wrapper = new QueryWrapper<>();
         wrapper.eq("user_id", userId)
-               .eq("coin_symbol", coinSymbol)
-               .eq("type", type)
+               .eq(coinSymbol != null && !coinSymbol.trim().isEmpty(), "coin_symbol", coinSymbol)
+               .eq(type != null, "type", type)
                .orderByDesc("create_time");
         return financeBillMapper.selectList(wrapper);
     }

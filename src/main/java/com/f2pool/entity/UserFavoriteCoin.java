@@ -5,22 +5,14 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
-@TableName("recharge_order")
-public class RechargeOrder {
+@TableName("user_favorite_coin")
+public class UserFavoriteCoin {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long userId;
-    private String asset;
-    private String network;
-    private BigDecimal amount;
-    private String voucherImage;
-    private Integer status;
-    private String auditRemark;
-    private Date auditTime;
+    private String coinSymbol;
     private Date createTime;
-    private Date updateTime;
 }

@@ -9,6 +9,7 @@ public class RechargeSubmitRequest {
     private Long userId;
     private String asset;
     private String network;
+    private BigDecimal amount;
     private BigDecimal amountCny;
     private String voucherImage;
 }

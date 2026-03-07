@@ -5,18 +5,22 @@ import com.f2pool.common.ApiException;
 import com.f2pool.common.R;
 import com.f2pool.entity.Banner;
 import com.f2pool.entity.MiningCoin;
+import com.f2pool.entity.SysConfig;
+import com.f2pool.mapper.SysConfigMapper;
 import com.f2pool.service.IBannerService;
 import com.f2pool.service.IMiningCoinService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,12 +30,18 @@ import java.util.Map;
 @RequestMapping("/api/public")
 public class PublicController {
     private static final BigDecimal TH_PER_PH = new BigDecimal("1000");
+    private static final String PRICE_PER_P_USD_KEY = "machine_price_per_p_usd";
 
     @Autowired
     private IMiningCoinService miningCoinService;
 
     @Autowired
     private IBannerService bannerService;
+    @Autowired
+    private SysConfigMapper sysConfigMapper;
+
+    @Value("${app.image-domain:https://api.kuaiyi.info}")
+    private String imageDomain;
 
     @ApiOperation("Get pool stats")
     @GetMapping("/pool/stats")
@@ -67,7 +77,7 @@ public class PublicController {
     @GetMapping("/banner/list")
     public R<List<Banner>> bannerList() {
         List<Banner> list = bannerService.list(new QueryWrapper<Banner>().orderByDesc("id"));
-        return R.ok(list);
+        return R.ok(withImageUrl(list));
     }
 
     @ApiOperation("Coin price trend (7/30/180/365 days)")
@@ -114,5 +124,61 @@ public class PublicController {
         result.put("dailyRevenueCny", dailyRevenueCny);
         result.put("price", coin.getPriceCny());
         return R.ok(result);
+    }
+
+    @ApiOperation("Get machine buy config")
+    @GetMapping("/order/buy-config")
+    public R<Map<String, Object>> getMachineBuyConfig() {
+        BigDecimal pricePerPUsd = BigDecimal.ZERO;
+        SysConfig cfg = sysConfigMapper.selectOne(
+                new QueryWrapper<SysConfig>().eq("config_key", PRICE_PER_P_USD_KEY).eq("status", 1)
+        );
+        if (cfg != null && cfg.getConfigValue() != null && !cfg.getConfigValue().trim().isEmpty()) {
+            try {
+                pricePerPUsd = new BigDecimal(cfg.getConfigValue().trim());
+            } catch (Exception ignored) {
+                pricePerPUsd = BigDecimal.ZERO;
+            }
+        }
+        Map<String, Object> map = new HashMap<>();
+        map.put("pricePerPUsd", pricePerPUsd);
+        return R.ok(map);
+    }
+
+    private List<Banner> withImageUrl(List<Banner> source) {
+        List<Banner> result = new ArrayList<>();
+        if (source == null) {
+            return result;
+        }
+        for (Banner banner : source) {
+            result.add(withImageUrl(banner));
+        }
+        return result;
+    }
+
+    private Banner withImageUrl(Banner source) {
+        if (source == null) {
+            return null;
+        }
+        Banner target = new Banner();
+        target.setId(source.getId());
+        target.setCreateTime(source.getCreateTime());
+        target.setUpdateTime(source.getUpdateTime());
+        target.setImage(toFullUrl(source.getImage()));
+        return target;
+    }
+
+    private String toFullUrl(String path) {
+        if (path == null || path.isEmpty()) {
+            return path;
+        }
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+            return path;
+        }
+        String domain = imageDomain == null ? "" : imageDomain.trim();
+        if (domain.endsWith("/")) {
+            domain = domain.substring(0, domain.length() - 1);
+        }
+        return domain + (path.startsWith("/") ? path : "/" + path);
     }
 }

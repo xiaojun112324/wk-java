@@ -5,10 +5,12 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.f2pool.dto.machine.UserMachineOrderActionRequest;
 import com.f2pool.dto.machine.UserMachineOrderBuyByPRequest;
 import com.f2pool.dto.machine.UserMachineOrderCreateRequest;
+import com.f2pool.entity.FinanceBill;
 import com.f2pool.entity.MiningCoin;
 import com.f2pool.entity.MiningMachine;
 import com.f2pool.entity.SysConfig;
 import com.f2pool.entity.UserMachineOrder;
+import com.f2pool.mapper.FinanceBillMapper;
 import com.f2pool.mapper.SysConfigMapper;
 import com.f2pool.mapper.UserMachineOrderMapper;
 import com.f2pool.service.IMiningCoinService;
@@ -17,7 +19,6 @@ import com.f2pool.service.IUserMachineOrderService;
 import com.f2pool.service.IUserWalletService;
 import com.f2pool.util.HashrateUnitUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -34,8 +35,6 @@ import java.util.Map;
 public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMapper, UserMachineOrder> implements IUserMachineOrderService {
     private static final BigDecimal TH_PER_PH = new BigDecimal("1000");
     private static final String PRICE_PER_P_USD_KEY = "machine_price_per_p_usd";
-    private static final String USD_CNY_CACHE_KEY = "f2pool:cache:fx:usd_cny";
-    private static final BigDecimal DEFAULT_USD_CNY = new BigDecimal("7.2");
 
     @Autowired
     private IMiningMachineService miningMachineService;
@@ -47,7 +46,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     @Autowired
     private SysConfigMapper sysConfigMapper;
     @Autowired
-    private StringRedisTemplate stringRedisTemplate;
+    private FinanceBillMapper financeBillMapper;
 
     @Override
     @Transactional
@@ -67,23 +66,10 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         BigDecimal hashrateThPerUnit = HashrateUnitUtil.toTH(machine.getHashrateValue(), machine.getHashrateUnit());
         BigDecimal totalHashrateTh = hashrateThPerUnit.multiply(quantityDec).setScale(8, RoundingMode.HALF_UP);
         BigDecimal totalInvest = machine.getPricePerUnit().multiply(quantityDec).setScale(8, RoundingMode.HALF_UP);
-        userWalletService.decreaseBalance(request.getUserId(), totalInvest);
+        userWalletService.decreaseBalance(request.getUserId(), "USDT", totalInvest);
 
-        MiningCoin coin = miningCoinService.query()
-                .select("symbol", "daily_revenue_per_p", "price_cny")
-                .eq("symbol", machine.getCoinSymbol())
-                .one();
-        BigDecimal todayRevenueCoin = BigDecimal.ZERO;
-        BigDecimal todayRevenueCny = BigDecimal.ZERO;
-        if (coin != null && coin.getDailyRevenuePerP() != null) {
-            todayRevenueCoin = totalHashrateTh
-                    .divide(TH_PER_PH, 12, RoundingMode.HALF_UP)
-                    .multiply(coin.getDailyRevenuePerP())
-                    .setScale(12, RoundingMode.HALF_UP);
-            if (coin.getPriceCny() != null) {
-                todayRevenueCny = todayRevenueCoin.multiply(coin.getPriceCny()).setScale(8, RoundingMode.HALF_UP);
-            }
-        }
+        BigDecimal todayRevenueCoin = BigDecimal.ZERO.setScale(12, RoundingMode.HALF_UP);
+        BigDecimal todayRevenueCny = BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP);
 
         UserMachineOrder order = new UserMachineOrder();
         order.setUserId(request.getUserId());
@@ -105,6 +91,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         order.setSellAmountCny(BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP));
         order.setStatus(1);
         save(order);
+        addFinanceBill(order.getUserId(), "USDT", 2, totalInvest, "MACHINE_BUY_" + order.getId());
 
         return buildOrderView(order);
     }
@@ -115,15 +102,27 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         validateBuyByPRequest(request);
 
         String symbol = request.getCoinSymbol().trim().toUpperCase();
-        BigDecimal pCount = request.getPCount().setScale(8, RoundingMode.HALF_UP);
         BigDecimal pricePerPUsd = getConfigDecimal(PRICE_PER_P_USD_KEY);
         if (pricePerPUsd.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("sys_config machine_price_per_p_usd must be greater than 0");
         }
-        BigDecimal usdCny = getUsdCnyRate();
-        BigDecimal unitPriceCny = pricePerPUsd.multiply(usdCny).setScale(8, RoundingMode.HALF_UP);
-        BigDecimal totalInvest = unitPriceCny.multiply(pCount).setScale(8, RoundingMode.HALF_UP);
-        userWalletService.decreaseBalance(request.getUserId(), totalInvest);
+        BigDecimal pCount = resolvePCount(request, pricePerPUsd);
+
+        BigDecimal totalInvest = pricePerPUsd.multiply(pCount).setScale(8, RoundingMode.HALF_UP);
+        BigDecimal usdtPay = normalizePayAmount(request.getUsdtPay());
+        BigDecimal usdcPay = normalizePayAmount(request.getUsdcPay());
+        if (usdtPay.compareTo(BigDecimal.ZERO) <= 0 && usdcPay.compareTo(BigDecimal.ZERO) <= 0) {
+            usdtPay = totalInvest;
+        }
+        if (usdtPay.add(usdcPay).setScale(8, RoundingMode.HALF_UP).compareTo(totalInvest) != 0) {
+            throw new IllegalArgumentException("usdtPay + usdcPay must equal total amount");
+        }
+        if (usdtPay.compareTo(BigDecimal.ZERO) > 0) {
+            userWalletService.decreaseBalance(request.getUserId(), "USDT", usdtPay);
+        }
+        if (usdcPay.compareTo(BigDecimal.ZERO) > 0) {
+            userWalletService.decreaseBalance(request.getUserId(), "USDC", usdcPay);
+        }
 
         MiningCoin coin = miningCoinService.getCoinDetail(null, symbol);
         if (coin == null) {
@@ -131,24 +130,18 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         }
 
         BigDecimal totalHashrateTh = pCount.multiply(TH_PER_PH).setScale(8, RoundingMode.HALF_UP);
-        BigDecimal todayRevenueCoin = BigDecimal.ZERO;
-        BigDecimal todayRevenueCny = BigDecimal.ZERO;
-        if (coin.getDailyRevenuePerP() != null) {
-            todayRevenueCoin = pCount.multiply(coin.getDailyRevenuePerP()).setScale(12, RoundingMode.HALF_UP);
-            if (coin.getPriceCny() != null) {
-                todayRevenueCny = todayRevenueCoin.multiply(coin.getPriceCny()).setScale(8, RoundingMode.HALF_UP);
-            }
-        }
+        BigDecimal todayRevenueCoin = BigDecimal.ZERO.setScale(12, RoundingMode.HALF_UP);
+        BigDecimal todayRevenueCny = BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP);
 
         UserMachineOrder order = new UserMachineOrder();
         order.setUserId(request.getUserId());
         order.setMachineId(0L);
         order.setCoinSymbol(symbol);
-        order.setMachineName(symbol + " P合约");
+        order.setMachineName(symbol + " P合同");
         order.setHashrateValue(pCount);
         order.setHashrateUnit("PH");
         order.setQuantity(1);
-        order.setUnitPrice(unitPriceCny);
+        order.setUnitPrice(pricePerPUsd);
         order.setTotalInvest(totalInvest);
         order.setTotalHashrateTh(totalHashrateTh);
         order.setTodayRevenueCoin(todayRevenueCoin);
@@ -160,10 +153,17 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         order.setSellAmountCny(BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP));
         order.setStatus(1);
         save(order);
+        if (usdtPay.compareTo(BigDecimal.ZERO) > 0) {
+            addFinanceBill(order.getUserId(), "USDT", 2, usdtPay, "MACHINE_BUY_P_" + order.getId());
+        }
+        if (usdcPay.compareTo(BigDecimal.ZERO) > 0) {
+            addFinanceBill(order.getUserId(), "USDC", 2, usdcPay, "MACHINE_BUY_P_" + order.getId());
+        }
 
         Map<String, Object> view = buildOrderView(order);
         view.put("pricePerPUsd", pricePerPUsd);
-        view.put("usdCny", usdCny);
+        view.put("usdtPay", usdtPay);
+        view.put("usdcPay", usdcPay);
         return view;
     }
 
@@ -197,14 +197,15 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     public Map<String, Object> sell(Long id, UserMachineOrderActionRequest request) {
         UserMachineOrder order = getOrderForOperate(id, request);
         if (order.getLockUntil() != null && new Date().before(order.getLockUntil())) {
-            throw new IllegalArgumentException("order is still in lock period");
+            throw new IllegalArgumentException("订单仍在锁仓期，暂不能卖出");
         }
         BigDecimal settleAmount = order.getTotalInvest().add(order.getTotalRevenueCny()).setScale(8, RoundingMode.HALF_UP);
         order.setSellAmountCny(settleAmount);
         order.setSellTime(new Date());
         order.setStatus(2);
         updateById(order);
-        userWalletService.increaseBalance(order.getUserId(), settleAmount);
+        userWalletService.increaseBalance(order.getUserId(), "USDT", settleAmount);
+        addFinanceBill(order.getUserId(), "USDT", 1, settleAmount, "MACHINE_SELL_" + order.getId());
         return buildOrderView(order);
     }
 
@@ -220,8 +221,26 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         order.setSellTime(new Date());
         order.setStatus(3);
         updateById(order);
-        userWalletService.increaseBalance(order.getUserId(), settleAmount);
+        userWalletService.increaseBalance(order.getUserId(), "USDT", settleAmount);
+        addFinanceBill(order.getUserId(), "USDT", 1, settleAmount, "MACHINE_CANCEL_" + order.getId());
         return buildOrderView(order);
+    }
+
+    private void addFinanceBill(Long userId, String coin, Integer type, BigDecimal amount, String txId) {
+        if (userId == null || !StringUtils.hasText(coin) || type == null || amount == null) {
+            return;
+        }
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        FinanceBill bill = new FinanceBill();
+        bill.setUserId(userId);
+        bill.setCoinSymbol(coin.trim().toUpperCase());
+        bill.setType(type);
+        bill.setAmount(amount.setScale(8, RoundingMode.HALF_UP));
+        bill.setCreateTime(new Date());
+        bill.setTxId(txId);
+        financeBillMapper.insert(bill);
     }
 
     private void validateRequest(UserMachineOrderCreateRequest request) {
@@ -249,9 +268,6 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         if (!StringUtils.hasText(request.getCoinSymbol())) {
             throw new IllegalArgumentException("coinSymbol is required");
         }
-        if (request.getPCount() == null || request.getPCount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("pCount must be greater than 0");
-        }
     }
 
     private BigDecimal getConfigDecimal(String key) {
@@ -266,18 +282,29 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         }
     }
 
-    private BigDecimal getUsdCnyRate() {
-        try {
-            String val = stringRedisTemplate.opsForValue().get(USD_CNY_CACHE_KEY);
-            if (StringUtils.hasText(val)) {
-                BigDecimal rate = new BigDecimal(val.trim());
-                if (rate.compareTo(BigDecimal.ZERO) > 0) {
-                    return rate;
-                }
-            }
-        } catch (Exception ignored) {
+    private BigDecimal normalizePayAmount(BigDecimal amount) {
+        if (amount == null) {
+            return BigDecimal.ZERO;
         }
-        return DEFAULT_USD_CNY;
+        if (amount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("pay amount must be >= 0");
+        }
+        return amount.setScale(8, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal resolvePCount(UserMachineOrderBuyByPRequest request, BigDecimal pricePerPUsd) {
+        if (request.getPCount() != null && request.getPCount().compareTo(BigDecimal.ZERO) > 0) {
+            return request.getPCount().setScale(8, RoundingMode.HALF_UP);
+        }
+        if (request.getTotalAmountUsd() != null && request.getTotalAmountUsd().compareTo(BigDecimal.ZERO) > 0
+                && pricePerPUsd != null && pricePerPUsd.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal derived = request.getTotalAmountUsd()
+                    .divide(pricePerPUsd, 8, RoundingMode.HALF_UP);
+            if (derived.compareTo(BigDecimal.ZERO) > 0) {
+                return derived;
+            }
+        }
+        throw new IllegalArgumentException("pCount must be greater than 0");
     }
 
     private UserMachineOrder getOrderForOperate(Long id, UserMachineOrderActionRequest request) {

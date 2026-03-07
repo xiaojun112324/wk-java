@@ -37,8 +37,8 @@ public class FinanceController {
     @ApiOperation("获取账单历史（收益/支出）")
     @GetMapping("/bill/list")
     public R<List<FinanceBill>> getBillList(@RequestHeader("Authorization") String authorization,
-                                            @RequestParam String coin,
-                                            @RequestParam Integer type) {
+                                            @RequestParam(required = false) String coin,
+                                            @RequestParam(required = false) Integer type) {
         Long userId = tokenContextUtil.requireUserId(authorization);
         return R.ok(financeService.getBillHistory(userId, coin, type));
     }

@@ -588,3 +588,97 @@
 - Path: `/api/wallet/withdraw/list`
 - Header: `Authorization`
 - 返回 `data`: `WithdrawOrderView[]`（字段同 4.7）
+
+## 客服聊天
+
+### 用户初始化会话
+- Method: `POST`
+- Path: `/api/chat/room/init`
+- Header: `Authorization`
+
+```json
+{
+  "roomId": 1,
+  "userId": 1001,
+  "adminId": null,
+  "lastMessage": "",
+  "lastMessageType": 1,
+  "lastMessageTime": null,
+  "unreadUser": 0,
+  "unreadAdmin": 0,
+  "status": 1,
+  "createTime": "2026-03-07 08:00:00",
+  "updateTime": "2026-03-07 08:00:00"
+}
+```
+
+### 用户轮询消息
+- Method: `GET`
+- Path: `/api/chat/messages`
+- Query: `roomId`(必填), `afterId`(选填), `limit`(选填)
+
+```json
+[
+  {
+    "id": 101,
+    "roomId": 1,
+    "senderType": 1,
+    "senderId": 1001,
+    "messageType": 1,
+    "messageContent": "你好",
+    "isRead": true,
+    "createTime": "2026-03-07 08:01:00",
+    "isSelf": true
+  }
+]
+```
+
+### 用户发送消息（文本/图片）
+- Method: `POST`
+- Path: `/api/chat/send`
+
+```json
+{
+  "roomId": 1,
+  "messageType": 1,
+  "messageContent": "请问充值多久到账"
+}
+```
+
+```json
+{
+  "roomId": 1,
+  "messageType": 2,
+  "messageContent": "https://api.kuaiyi.info/file/abc.png"
+}
+```
+
+### 用户标记已读
+- Method: `POST`
+- Path: `/api/chat/read?roomId=1`
+
+## 我的自选
+
+### 添加自选
+- Method: `POST`
+- Path: `/api/favorite/{symbol}`
+
+### 取消自选
+- Method: `DELETE`
+- Path: `/api/favorite/{symbol}`
+
+### 检查是否已自选
+- Method: `GET`
+- Path: `/api/favorite/check?symbol=BTC`
+
+```json
+{
+  "symbol": "BTC",
+  "favorite": true
+}
+```
+
+### 我的自选列表
+- Method: `GET`
+- Path: `/api/favorite/list`
+- 返回字段：与矿池统计币种字段一致，附加 `favorite=true` 和 `favoriteTime`

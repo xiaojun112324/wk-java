@@ -80,3 +80,21 @@
 - GET /api/admin/config/{key}
 - PUT /api/admin/config/{key}
 
+
+### 在线客服
+- POST /api/chat/room/init
+- GET /api/chat/messages
+- POST /api/chat/send
+- POST /api/chat/read
+
+### 我的自选
+- POST /api/favorite/{symbol}
+- DELETE /api/favorite/{symbol}
+- GET /api/favorite/check
+- GET /api/favorite/list
+
+### 客服聊天管理（后台）
+- GET /api/admin/chat/rooms
+- GET /api/admin/chat/messages
+- POST /api/admin/chat/send
+- POST /api/admin/chat/read

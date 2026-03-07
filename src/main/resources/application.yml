@@ -5,6 +5,9 @@ server:
 spring:
   application:
     name: f2pool-backend
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://121.127.231.209:3306/wk-mysql?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
@@ -37,6 +40,9 @@ springdoc:
 jwt:
   secret: ${JWT_SECRET:change-this-to-a-very-long-random-secret-key-please-1234567890}
   expire-seconds: ${JWT_EXPIRE_SECONDS:604800}
+
+app:
+  image-domain: https://api.kuaiyi.info
 
 logging:
   level:

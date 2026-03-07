@@ -9,5 +9,7 @@ public class UserMachineOrderBuyByPRequest {
     private Long userId;
     private String coinSymbol;
     private BigDecimal pCount;
+    private BigDecimal totalAmountUsd;
+    private BigDecimal usdtPay;
+    private BigDecimal usdcPay;
 }
-

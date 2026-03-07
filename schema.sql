@@ -119,10 +119,18 @@ DROP TABLE IF EXISTS `user_wallet`;
 CREATE TABLE `user_wallet` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `user_id` bigint(20) NOT NULL COMMENT 'user id',
-  `balance_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'available CNY balance',
-  `freeze_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'frozen CNY balance',
-  `total_recharge_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'approved recharge total',
-  `total_withdraw_cny` decimal(30,8) DEFAULT '0.00000000' COMMENT 'approved withdraw total',
+  `usdt_balance` decimal(30,8) DEFAULT '0.00000000' COMMENT 'available USDT balance',
+  `usdc_balance` decimal(30,8) DEFAULT '0.00000000' COMMENT 'available USDC balance',
+  `btc_balance` decimal(30,8) DEFAULT '0.00000000' COMMENT 'available BTC balance',
+  `usdt_freeze` decimal(30,8) DEFAULT '0.00000000' COMMENT 'frozen USDT balance',
+  `usdc_freeze` decimal(30,8) DEFAULT '0.00000000' COMMENT 'frozen USDC balance',
+  `btc_freeze` decimal(30,8) DEFAULT '0.00000000' COMMENT 'frozen BTC balance',
+  `total_recharge_usdt` decimal(30,8) DEFAULT '0.00000000' COMMENT 'approved recharge total USDT',
+  `total_recharge_usdc` decimal(30,8) DEFAULT '0.00000000' COMMENT 'approved recharge total USDC',
+  `total_recharge_btc` decimal(30,8) DEFAULT '0.00000000' COMMENT 'approved recharge total BTC',
+  `total_withdraw_usdt` decimal(30,8) DEFAULT '0.00000000' COMMENT 'approved withdraw total USDT',
+  `total_withdraw_usdc` decimal(30,8) DEFAULT '0.00000000' COMMENT 'approved withdraw total USDC',
+  `total_withdraw_btc` decimal(30,8) DEFAULT '0.00000000' COMMENT 'approved withdraw total BTC',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -136,9 +144,9 @@ DROP TABLE IF EXISTS `recharge_order`;
 CREATE TABLE `recharge_order` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `user_id` bigint(20) NOT NULL COMMENT 'user id',
-  `asset` varchar(16) NOT NULL COMMENT 'USDT/USDC',
-  `network` varchar(16) NOT NULL COMMENT 'TRC20/ERC20',
-  `amount_cny` decimal(30,8) NOT NULL COMMENT 'recharge amount in CNY',
+  `asset` varchar(16) NOT NULL COMMENT 'USDT/USDC/BTC',
+  `network` varchar(16) NOT NULL COMMENT 'TRC20/ERC20/BTC',
+  `amount` decimal(30,8) NOT NULL COMMENT 'recharge amount',
   `voucher_image` varchar(512) NOT NULL COMMENT 'voucher image path/url',
   `status` int(2) DEFAULT '0' COMMENT '0 pending, 1 approved, 2 rejected',
   `audit_remark` varchar(255) DEFAULT NULL COMMENT 'audit remark',
@@ -156,9 +164,9 @@ DROP TABLE IF EXISTS `withdraw_order`;
 CREATE TABLE `withdraw_order` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `user_id` bigint(20) NOT NULL COMMENT 'user id',
-  `asset` varchar(16) NOT NULL COMMENT 'USDT/USDC',
-  `network` varchar(16) NOT NULL COMMENT 'TRC20/ERC20',
-  `amount_cny` decimal(30,8) NOT NULL COMMENT 'withdraw amount in CNY',
+  `asset` varchar(16) NOT NULL COMMENT 'USDT/USDC/BTC',
+  `network` varchar(16) NOT NULL COMMENT 'TRC20/ERC20/BTC',
+  `amount` decimal(30,8) NOT NULL COMMENT 'withdraw amount',
   `receive_address` varchar(255) NOT NULL COMMENT 'user receive address',
   `status` int(2) DEFAULT '0' COMMENT '0 pending, 1 approved, 2 rejected',
   `audit_remark` varchar(255) DEFAULT NULL COMMENT 'audit remark',
@@ -302,5 +310,59 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `remark`) VALUES
 ('recharge_usdc_trc20_address', 'TRC20_DEMO_ADDRESS', 'system recharge address'),
 ('recharge_usdc_erc20_address', 'ERC20_DEMO_ADDRESS', 'system recharge address'),
 ('machine_price_per_p_usd', '120', 'unit price per P in USD for coin detail buy-by-p'),
+('machine_daily_settle_time', '09:00', 'machine daily revenue settlement time HH:mm'),
 ('invite_rebate_level1_rate', '0.05000000', 'first-level invite rebate rate for approved recharge'),
 ('invite_rebate_level2_rate', '0.02000000', 'second-level invite rebate rate for approved recharge');
+
+-- ----------------------------
+-- Table structure for customer_chat_room
+-- ----------------------------
+DROP TABLE IF EXISTS `customer_chat_room`;
+CREATE TABLE `customer_chat_room` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) NOT NULL COMMENT 'chat owner user id',
+  `admin_id` bigint(20) DEFAULT NULL COMMENT 'assigned admin user id',
+  `last_message` varchar(1000) DEFAULT NULL COMMENT 'last message preview',
+  `last_message_type` int(2) DEFAULT '1' COMMENT '1 text, 2 image',
+  `last_message_time` datetime DEFAULT NULL COMMENT 'last message time',
+  `unread_user` int(11) DEFAULT '0' COMMENT 'unread count for user',
+  `unread_admin` int(11) DEFAULT '0' COMMENT 'unread count for admin',
+  `status` int(2) DEFAULT '1' COMMENT '1 active, 0 closed',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_chat_room_user` (`user_id`,`status`),
+  KEY `idx_chat_room_admin` (`admin_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='customer service chat room';
+
+-- ----------------------------
+-- Table structure for customer_chat_message
+-- ----------------------------
+DROP TABLE IF EXISTS `customer_chat_message`;
+CREATE TABLE `customer_chat_message` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `room_id` bigint(20) NOT NULL COMMENT 'customer chat room id',
+  `sender_type` int(2) NOT NULL COMMENT '1 user, 2 admin',
+  `sender_id` bigint(20) NOT NULL COMMENT 'sender id',
+  `message_type` int(2) NOT NULL COMMENT '1 text, 2 image',
+  `message_content` text NOT NULL COMMENT 'message body or image url',
+  `is_read` int(2) DEFAULT '0' COMMENT '0 unread, 1 read',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_chat_msg_room` (`room_id`,`id`),
+  KEY `idx_chat_msg_room_sender_read` (`room_id`,`sender_type`,`is_read`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='customer service chat message';
+
+-- ----------------------------
+-- Table structure for user_favorite_coin
+-- ----------------------------
+DROP TABLE IF EXISTS `user_favorite_coin`;
+CREATE TABLE `user_favorite_coin` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) NOT NULL COMMENT 'user id',
+  `coin_symbol` varchar(16) NOT NULL COMMENT 'coin symbol, e.g. BTC',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_symbol` (`user_id`,`coin_symbol`),
+  KEY `idx_fav_user_id` (`user_id`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='user favorite coin list';

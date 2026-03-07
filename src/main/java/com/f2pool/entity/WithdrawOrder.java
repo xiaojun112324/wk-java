@@ -16,7 +16,7 @@ public class WithdrawOrder {
     private Long userId;
     private String asset;
     private String network;
-    private BigDecimal amountCny;
+    private BigDecimal amount;
     private String receiveAddress;
     private Integer status;
     private String auditRemark;
