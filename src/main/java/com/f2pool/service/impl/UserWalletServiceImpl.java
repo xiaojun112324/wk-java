@@ -189,7 +189,6 @@ public class UserWalletServiceImpl implements IUserWalletService {
             setBalanceByAsset(wallet, asset, getBalanceByAsset(wallet, asset).add(order.getAmount()));
             setTotalRechargeByAsset(wallet, asset, getTotalRechargeByAsset(wallet, asset).add(order.getAmount()));
             userWalletMapper.updateById(wallet);
-            processInviteRebate(order);
         }
         return buildRecharge(order);
     }
@@ -639,26 +638,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     }
 
     private void processInviteRebate(RechargeOrder order) {
-        if (order == null || order.getId() == null || order.getUserId() == null || order.getAmount() == null) {
-            return;
-        }
-        SysUser sourceUser = sysUserMapper.selectById(order.getUserId());
-        if (sourceUser == null || sourceUser.getInviterId() == null) {
-            return;
-        }
-
-        BigDecimal level1Rate = getConfigDecimal(LEVEL1_RATE_KEY, BigDecimal.ZERO);
-        BigDecimal level2Rate = getConfigDecimal(LEVEL2_RATE_KEY, BigDecimal.ZERO);
-
-        Long level1UserId = sourceUser.getInviterId();
-        if (level1Rate.compareTo(BigDecimal.ZERO) > 0) {
-            grantInviteRebate(level1UserId, sourceUser.getId(), order, 1, level1Rate);
-        }
-
-        SysUser level1User = sysUserMapper.selectById(level1UserId);
-        if (level1User != null && level1User.getInviterId() != null && level2Rate.compareTo(BigDecimal.ZERO) > 0) {
-            grantInviteRebate(level1User.getInviterId(), sourceUser.getId(), order, 2, level2Rate);
-        }
+        // 邀请返利机制已停用：充值审核通过后不再发放返利
     }
 
     private void grantInviteRebate(Long beneficiaryUserId, Long sourceUserId, RechargeOrder order, int level, BigDecimal rate) {
