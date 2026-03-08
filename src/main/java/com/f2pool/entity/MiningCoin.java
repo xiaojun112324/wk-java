@@ -20,6 +20,8 @@ public class MiningCoin {
     private String poolHashrate;
     private String networkHashrate;
     private BigDecimal priceCny;
+    @TableField(exist = false)
+    private BigDecimal priceUsd;
     @TableField("daily_revenue_per_p")
     private BigDecimal dailyRevenuePerP;
     private Integer status;

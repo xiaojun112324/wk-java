@@ -172,6 +172,9 @@ public class MiningCoinServiceImpl extends ServiceImpl<MiningCoinMapper, MiningC
         if (row.containsKey("priceCny") && row.getBigDecimal("priceCny") != null) {
             coin.setPriceCny(row.getBigDecimal("priceCny"));
         }
+        if (row.containsKey("priceUsd") && row.getBigDecimal("priceUsd") != null) {
+            coin.setPriceUsd(row.getBigDecimal("priceUsd"));
+        }
         if (row.containsKey("marketCap") && row.getBigDecimal("marketCap") != null) {
             coin.setMarketCap(row.getBigDecimal("marketCap"));
         }

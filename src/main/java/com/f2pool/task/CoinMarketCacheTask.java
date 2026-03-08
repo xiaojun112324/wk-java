@@ -176,6 +176,7 @@ public class CoinMarketCacheTask {
             }
 
             JSONObject item = new JSONObject();
+            item.put("priceUsd", last.setScale(8, RoundingMode.HALF_UP));
             item.put("priceCny", priceCny);
             item.put("priceChange24h", change24h);
             if (high24h != null) {
