@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.f2pool.dto.machine.UserMachineOrderActionRequest;
 import com.f2pool.dto.machine.UserMachineOrderBuyByPRequest;
 import com.f2pool.dto.machine.UserMachineOrderCreateRequest;
+import com.f2pool.dto.machine.UserMachineRevenueWithdrawRequest;
 import com.f2pool.entity.UserMachineOrder;
 
 import java.util.List;
@@ -20,4 +21,10 @@ public interface IUserMachineOrderService extends IService<UserMachineOrder> {
     Map<String, Object> sell(Long id, UserMachineOrderActionRequest request);
 
     Map<String, Object> cancel(Long id, UserMachineOrderActionRequest request);
+
+    Map<String, Object> withdrawRevenue(Long id, UserMachineRevenueWithdrawRequest request);
+
+    Map<String, Object> withdrawRevenueAll(UserMachineRevenueWithdrawRequest request);
+
+    Map<String, Object> revenueWithdrawSummary(Long userId);
 }

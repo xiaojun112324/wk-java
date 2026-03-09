@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 public class UserMachineOrderBuyByPRequest {
     private Long userId;
     private String coinSymbol;
+    private String receiveAddress;
     private BigDecimal pCount;
     private BigDecimal totalAmountUsd;
     private BigDecimal usdtPay;

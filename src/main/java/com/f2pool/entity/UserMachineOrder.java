@@ -27,6 +27,8 @@ public class UserMachineOrder {
     private BigDecimal todayRevenueCny;
     private BigDecimal totalRevenueCoin;
     private BigDecimal totalRevenueCny;
+    private BigDecimal extractedRevenueCoin;
+    private String receiveAddress;
     private Date lockUntil;
     private BigDecimal sellAmountCny;
     private Date sellTime;

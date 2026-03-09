@@ -9,7 +9,6 @@ import com.f2pool.mapper.FinanceBillMapper;
 import com.f2pool.mapper.SysConfigMapper;
 import com.f2pool.mapper.UserMachineOrderMapper;
 import com.f2pool.service.IMiningCoinService;
-import com.f2pool.service.IUserWalletService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -39,8 +38,6 @@ public class MachineRevenueSettleTask {
     private UserMachineOrderMapper userMachineOrderMapper;
     @Autowired
     private FinanceBillMapper financeBillMapper;
-    @Autowired
-    private IUserWalletService userWalletService;
     @Autowired
     private SysConfigMapper sysConfigMapper;
     @Autowired
@@ -118,14 +115,11 @@ public class MachineRevenueSettleTask {
         );
         userMachineOrderMapper.updateById(order);
 
-        BigDecimal walletBtc = revenueBtc.setScale(8, RoundingMode.HALF_UP);
-        userWalletService.increaseBalance(order.getUserId(), "BTC", walletBtc);
-
         FinanceBill bill = new FinanceBill();
         bill.setUserId(order.getUserId());
         bill.setCoinSymbol("BTC");
         bill.setType(1);
-        bill.setAmount(walletBtc);
+        bill.setAmount(revenueBtc.setScale(8, RoundingMode.HALF_UP));
         bill.setCreateTime(new Date());
         bill.setTxId(txId);
         financeBillMapper.insert(bill);

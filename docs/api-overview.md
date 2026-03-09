@@ -1,4 +1,4 @@
-﻿# 接口总览（导航）
+# 接口总览（导航）
 
 更新时间：2026-03-06
 
@@ -27,6 +27,9 @@
 - GET /api/order/machine/{id}
 - POST /api/order/machine/{id}/sell
 - POST /api/order/machine/{id}/cancel
+- POST /api/order/machine/{id}/revenue/withdraw
+- POST /api/order/machine/revenue/withdraw-all
+- GET /api/order/machine/revenue/summary
 
 ### 收益
 - GET /api/finance/account
@@ -45,6 +48,8 @@
 - POST /api/wallet/withdraw/submit
 - GET /api/wallet/recharge/list
 - GET /api/wallet/withdraw/list
+- POST /api/wallet/receive-address/add
+- GET /api/wallet/receive-address/list
 
 ## 管理后台模块
 

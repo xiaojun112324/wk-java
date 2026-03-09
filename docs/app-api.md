@@ -1,4 +1,4 @@
-﻿# APP 接口文档（完整返回字段）
+# APP 接口文档（完整返回字段）
 
 更新时间：2026-03-06
 
@@ -270,13 +270,20 @@
 - Method: `POST`
 - Path: `/api/order/machine/buy-by-p`
 - Header: `Authorization`
-- 说明：按币种直接购买算力，单位为 `P`。每P单价来自 `sys_config.machine_price_per_p_usd`（USD），后端按汇率折算为 CNY 扣款并生成订单。
+- 说明：按币种直接购买算力，单位为 `P`。每P单价来自 `sys_config.machine_price_per_p_usd`（USD）。
+- 规则：
+  - 当前仅支持 `BTC`
+  - 必须选择已绑定的收款地址 `receiveAddress`
+  - 若未绑定地址，返回错误：`please bind receive address before buying`
 - 请求体：
 
 ```json
 {
   "coinSymbol": "BTC",
-  "pCount": 1.5
+  "pCount": 1.5,
+  "receiveAddress": "bc1qxxxx",
+  "usdtPay": 100.00000000,
+  "usdcPay": 50.00000000
 }
 ```
 
@@ -285,9 +292,42 @@
 ```json
 {
   "pricePerPUsd": 120.00000000,
-  "usdCny": 7.20000000
+  "usdtPay": 80.00000000,
+  "usdcPay": 40.00000000
 }
 ```
+
+### 2.8 提取单个订单收益
+- Method: `POST`
+- Path: `/api/order/machine/{id}/revenue/withdraw`
+- Header: `Authorization`
+- 请求体：
+
+```json
+{
+  "receiveAddress": "bc1qxxxxxx"
+}
+```
+
+- 说明：发起后生成 `BTC/BTC` 提现审核单，后台审核通过后完成提现；审核拒绝会自动回滚该订单可提取收益。
+
+### 2.9 一键提取收益
+- Method: `POST`
+- Path: `/api/order/machine/revenue/withdraw-all`
+- Header: `Authorization`
+- 请求体：
+
+```json
+{
+  "receiveAddress": "bc1qxxxxxx",
+  "orderIds": [101, 102]
+}
+```
+
+### 2.10 可提取收益汇总
+- Method: `GET`
+- Path: `/api/order/machine/revenue/summary`
+- Header: `Authorization`
 
 ## 3. 收益
 
@@ -549,6 +589,10 @@
 - Method: `POST`
 - Path: `/api/wallet/withdraw/submit`
 - Header: `Authorization`
+- 规则：
+  - 资金密码必须已设置并校验通过
+  - `receiveAddress` 必须是当前用户已绑定地址
+  - 若未绑定地址，返回错误：`please bind receive address before withdraw`
 - 请求体：
 
 ```json
@@ -556,7 +600,8 @@
   "asset": "USDC",
   "network": "ERC20",
   "amountCny": 500,
-  "receiveAddress": "0xabc..."
+  "receiveAddress": "0xabc...",
+  "withdrawPassword": "123456"
 }
 ```
 
@@ -588,6 +633,41 @@
 - Path: `/api/wallet/withdraw/list`
 - Header: `Authorization`
 - 返回 `data`: `WithdrawOrderView[]`（字段同 4.7）
+
+### 4.10 收款地址绑定
+- Method: `POST`
+- Path: `/api/wallet/receive-address/add`
+- Header: `Authorization`
+- 说明：新增用户收款地址，新增时必须验证资金密码。
+- 请求体：
+
+```json
+{
+  "receiveAddress": "bc1qxxxxxx",
+  "remark": "币安主账户",
+  "fundPassword": "123456"
+}
+```
+
+### 4.11 收款地址列表
+- Method: `GET`
+- Path: `/api/wallet/receive-address/list`
+- Header: `Authorization`
+- 返回 `data`: `ReceiveAddressView[]`
+
+```json
+[
+  {
+    "id": 1,
+    "userId": 1001,
+    "receiveAddress": "bc1qxxxxxx",
+    "remark": "币安主账户",
+    "status": 1,
+    "createTime": "2026-03-09T10:00:00",
+    "updateTime": "2026-03-09T10:00:00"
+  }
+]
+```
 
 ## 客服聊天
 

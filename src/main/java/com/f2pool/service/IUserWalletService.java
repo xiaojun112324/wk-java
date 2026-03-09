@@ -1,6 +1,9 @@
 package com.f2pool.service;
 
 import com.f2pool.dto.wallet.AuditRequest;
+import com.f2pool.dto.wallet.ReceiveAddressAddRequest;
+import com.f2pool.dto.wallet.ReceiveAddressDeleteRequest;
+import com.f2pool.dto.wallet.ReceiveAddressUpdateRequest;
 import com.f2pool.dto.wallet.RechargeSubmitRequest;
 import com.f2pool.dto.wallet.WithdrawSubmitRequest;
 
@@ -16,6 +19,14 @@ public interface IUserWalletService {
     Map<String, Object> submitRecharge(RechargeSubmitRequest request);
 
     Map<String, Object> submitWithdraw(WithdrawSubmitRequest request);
+
+    Map<String, Object> addReceiveAddress(ReceiveAddressAddRequest request);
+
+    Map<String, Object> updateReceiveAddress(ReceiveAddressUpdateRequest request);
+
+    Map<String, Object> deleteReceiveAddress(ReceiveAddressDeleteRequest request);
+
+    List<Map<String, Object>> listReceiveAddress(Long userId);
 
     List<Map<String, Object>> listRechargeByUser(Long userId);
 

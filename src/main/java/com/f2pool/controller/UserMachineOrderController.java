@@ -6,6 +6,7 @@ import com.f2pool.common.TokenContextUtil;
 import com.f2pool.dto.machine.UserMachineOrderActionRequest;
 import com.f2pool.dto.machine.UserMachineOrderBuyByPRequest;
 import com.f2pool.dto.machine.UserMachineOrderCreateRequest;
+import com.f2pool.dto.machine.UserMachineRevenueWithdrawRequest;
 import com.f2pool.service.IUserMachineOrderService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -40,7 +41,7 @@ public class UserMachineOrderController {
         return R.ok(userMachineOrderService.createOrder(request));
     }
 
-    @ApiOperation("按币种按P购买订单")
+    @ApiOperation("按P购买矿机订单")
     @PostMapping("/buy-by-p")
     public R<Map<String, Object>> createByP(@RequestHeader("Authorization") String authorization,
                                             @RequestBody UserMachineOrderBuyByPRequest request) {
@@ -68,11 +69,11 @@ public class UserMachineOrderController {
         return R.ok(order);
     }
 
-    @ApiOperation("锁仓期后卖出矿机订单")
+    @ApiOperation("回收算力（卖出订单）")
     @PostMapping("/{id}/sell")
     public R<Map<String, Object>> sell(@RequestHeader("Authorization") String authorization,
-                                        @PathVariable Long id,
-                                        @RequestBody(required = false) UserMachineOrderActionRequest request) {
+                                       @PathVariable Long id,
+                                       @RequestBody(required = false) UserMachineOrderActionRequest request) {
         Long userId = tokenContextUtil.requireUserId(authorization);
         if (request == null) {
             request = new UserMachineOrderActionRequest();
@@ -81,11 +82,43 @@ public class UserMachineOrderController {
         return R.ok(userMachineOrderService.sell(id, request));
     }
 
+    @ApiOperation("提取单个订单收益（走提现审核）")
+    @PostMapping("/{id}/revenue/withdraw")
+    public R<Map<String, Object>> withdrawRevenue(@RequestHeader("Authorization") String authorization,
+                                                  @PathVariable Long id,
+                                                  @RequestBody(required = false) UserMachineRevenueWithdrawRequest request) {
+        Long userId = tokenContextUtil.requireUserId(authorization);
+        if (request == null) {
+            request = new UserMachineRevenueWithdrawRequest();
+        }
+        request.setUserId(userId);
+        return R.ok(userMachineOrderService.withdrawRevenue(id, request));
+    }
+
+    @ApiOperation("一键提取收益（整合为一个提现审核单）")
+    @PostMapping("/revenue/withdraw-all")
+    public R<Map<String, Object>> withdrawRevenueAll(@RequestHeader("Authorization") String authorization,
+                                                     @RequestBody(required = false) UserMachineRevenueWithdrawRequest request) {
+        Long userId = tokenContextUtil.requireUserId(authorization);
+        if (request == null) {
+            request = new UserMachineRevenueWithdrawRequest();
+        }
+        request.setUserId(userId);
+        return R.ok(userMachineOrderService.withdrawRevenueAll(request));
+    }
+
+    @ApiOperation("可提取收益汇总")
+    @GetMapping("/revenue/summary")
+    public R<Map<String, Object>> revenueSummary(@RequestHeader("Authorization") String authorization) {
+        Long userId = tokenContextUtil.requireUserId(authorization);
+        return R.ok(userMachineOrderService.revenueWithdrawSummary(userId));
+    }
+
     @ApiOperation("收益结算前取消矿机订单")
     @PostMapping("/{id}/cancel")
     public R<Map<String, Object>> cancel(@RequestHeader("Authorization") String authorization,
-                                          @PathVariable Long id,
-                                          @RequestBody(required = false) UserMachineOrderActionRequest request) {
+                                         @PathVariable Long id,
+                                         @RequestBody(required = false) UserMachineOrderActionRequest request) {
         Long userId = tokenContextUtil.requireUserId(authorization);
         if (request == null) {
             request = new UserMachineOrderActionRequest();

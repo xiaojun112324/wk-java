@@ -4,20 +4,28 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.f2pool.dto.wallet.AuditRequest;
+import com.f2pool.dto.wallet.ReceiveAddressAddRequest;
+import com.f2pool.dto.wallet.ReceiveAddressDeleteRequest;
+import com.f2pool.dto.wallet.ReceiveAddressUpdateRequest;
 import com.f2pool.dto.wallet.RechargeSubmitRequest;
 import com.f2pool.dto.wallet.WithdrawSubmitRequest;
 import com.f2pool.entity.InviteRebateOrder;
+import com.f2pool.entity.MachineRevenueWithdrawItem;
 import com.f2pool.entity.RechargeOrder;
 import com.f2pool.entity.SysConfig;
 import com.f2pool.entity.SysUser;
+import com.f2pool.entity.UserMachineOrder;
+import com.f2pool.entity.UserReceiveAddress;
 import com.f2pool.entity.UserWallet;
 import com.f2pool.entity.WithdrawOrder;
 import com.f2pool.mapper.InviteRebateOrderMapper;
+import com.f2pool.mapper.MachineRevenueWithdrawItemMapper;
 import com.f2pool.mapper.MiningCoinMapper;
 import com.f2pool.mapper.RechargeOrderMapper;
 import com.f2pool.mapper.SysConfigMapper;
 import com.f2pool.mapper.SysUserMapper;
 import com.f2pool.mapper.UserMachineOrderMapper;
+import com.f2pool.mapper.UserReceiveAddressMapper;
 import com.f2pool.mapper.UserWalletMapper;
 import com.f2pool.mapper.WithdrawOrderMapper;
 import com.f2pool.service.IUserWalletService;
@@ -35,6 +43,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserWalletServiceImpl implements IUserWalletService {
+    private static final int WITHDRAW_SOURCE_WALLET = 1;
+    private static final int WITHDRAW_SOURCE_MACHINE_REVENUE = 2;
     private static final String LEVEL1_RATE_KEY = "invite_rebate_level1_rate";
     private static final String LEVEL2_RATE_KEY = "invite_rebate_level2_rate";
     private static final String CACHE_USD_CNY_KEY = "f2pool:cache:fx:usd_cny";
@@ -51,6 +61,8 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Autowired
     private WithdrawOrderMapper withdrawOrderMapper;
     @Autowired
+    private UserReceiveAddressMapper userReceiveAddressMapper;
+    @Autowired
     private SysConfigMapper sysConfigMapper;
     @Autowired
     private SysUserMapper sysUserMapper;
@@ -58,6 +70,8 @@ public class UserWalletServiceImpl implements IUserWalletService {
     private InviteRebateOrderMapper inviteRebateOrderMapper;
     @Autowired
     private UserMachineOrderMapper userMachineOrderMapper;
+    @Autowired
+    private MachineRevenueWithdrawItemMapper machineRevenueWithdrawItemMapper;
     @Autowired
     private MiningCoinMapper miningCoinMapper;
     @Autowired
@@ -116,9 +130,109 @@ public class UserWalletServiceImpl implements IUserWalletService {
         order.setNetwork(request.getNetwork().trim().toUpperCase());
         order.setAmount(amount);
         order.setReceiveAddress(request.getReceiveAddress().trim());
+        order.setSourceType(WITHDRAW_SOURCE_WALLET);
         order.setStatus(0);
         withdrawOrderMapper.insert(order);
         return buildWithdraw(order);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> addReceiveAddress(ReceiveAddressAddRequest request) {
+        validateReceiveAddressAddRequest(request);
+        String network = normalizeReceiveAddressNetwork(request.getNetwork());
+        String receiveAddress = request.getReceiveAddress().trim();
+        Long exists = userReceiveAddressMapper.selectCount(
+                new QueryWrapper<UserReceiveAddress>()
+                        .eq("user_id", request.getUserId())
+                        .eq("network", network)
+                        .eq("receive_address", receiveAddress)
+                        .eq("status", 1)
+        );
+        if (exists != null && exists > 0) {
+            throw new IllegalArgumentException("receive address already exists");
+        }
+        UserReceiveAddress entity = new UserReceiveAddress();
+        entity.setUserId(request.getUserId());
+        entity.setNetwork(network);
+        entity.setReceiveAddress(receiveAddress);
+        entity.setRemark(StringUtils.hasText(request.getRemark()) ? request.getRemark().trim() : null);
+        entity.setStatus(1);
+        userReceiveAddressMapper.insert(entity);
+        return buildReceiveAddress(entity);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> updateReceiveAddress(ReceiveAddressUpdateRequest request) {
+        validateReceiveAddressUpdateRequest(request);
+        UserReceiveAddress current = userReceiveAddressMapper.selectById(request.getId());
+        if (current == null || current.getStatus() == null || current.getStatus() != 1) {
+            throw new IllegalArgumentException("receive address not found");
+        }
+        if (!Objects.equals(current.getUserId(), request.getUserId())) {
+            throw new IllegalArgumentException("receive address not found");
+        }
+
+        String network = normalizeReceiveAddressNetwork(request.getNetwork());
+        String receiveAddress = request.getReceiveAddress().trim();
+        Long exists = userReceiveAddressMapper.selectCount(
+                new QueryWrapper<UserReceiveAddress>()
+                        .eq("user_id", request.getUserId())
+                        .eq("network", network)
+                        .eq("receive_address", receiveAddress)
+                        .eq("status", 1)
+                        .ne("id", request.getId())
+        );
+        if (exists != null && exists > 0) {
+            throw new IllegalArgumentException("receive address already exists");
+        }
+
+        current.setNetwork(network);
+        current.setReceiveAddress(receiveAddress);
+        current.setRemark(StringUtils.hasText(request.getRemark()) ? request.getRemark().trim() : null);
+        current.setUpdateTime(new Date());
+        userReceiveAddressMapper.updateById(current);
+        return buildReceiveAddress(current);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> deleteReceiveAddress(ReceiveAddressDeleteRequest request) {
+        validateReceiveAddressDeleteRequest(request);
+        UserReceiveAddress current = userReceiveAddressMapper.selectById(request.getId());
+        if (current == null || current.getStatus() == null || current.getStatus() != 1) {
+            throw new IllegalArgumentException("receive address not found");
+        }
+        if (!Objects.equals(current.getUserId(), request.getUserId())) {
+            throw new IllegalArgumentException("receive address not found");
+        }
+        current.setStatus(0);
+        current.setUpdateTime(new Date());
+        userReceiveAddressMapper.updateById(current);
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", request.getId());
+        map.put("deleted", true);
+        return map;
+    }
+
+    @Override
+    public List<Map<String, Object>> listReceiveAddress(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        List<UserReceiveAddress> list = userReceiveAddressMapper.selectList(
+                new QueryWrapper<UserReceiveAddress>()
+                        .eq("user_id", userId)
+                        .eq("status", 1)
+                        .orderByDesc("id")
+        );
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (UserReceiveAddress item : list) {
+            result.add(buildReceiveAddress(item));
+        }
+        return result;
     }
 
     @Override
@@ -209,17 +323,68 @@ public class UserWalletServiceImpl implements IUserWalletService {
         order.setAuditTime(new Date());
         withdrawOrderMapper.updateById(order);
 
-        UserWallet wallet = getOrCreateWallet(order.getUserId());
-        String asset = normalizeAsset(order.getAsset());
-        if (request.getStatus() == 1) {
-            setFreezeByAsset(wallet, asset, getFreezeByAsset(wallet, asset).subtract(order.getAmount()));
-            setTotalWithdrawByAsset(wallet, asset, getTotalWithdrawByAsset(wallet, asset).add(order.getAmount()));
-        } else {
-            setFreezeByAsset(wallet, asset, getFreezeByAsset(wallet, asset).subtract(order.getAmount()));
-            setBalanceByAsset(wallet, asset, getBalanceByAsset(wallet, asset).add(order.getAmount()));
+        int sourceType = order.getSourceType() == null ? WITHDRAW_SOURCE_WALLET : order.getSourceType();
+        if (sourceType == WITHDRAW_SOURCE_WALLET) {
+            UserWallet wallet = getOrCreateWallet(order.getUserId());
+            String asset = normalizeAsset(order.getAsset());
+            if (request.getStatus() == 1) {
+                setFreezeByAsset(wallet, asset, getFreezeByAsset(wallet, asset).subtract(order.getAmount()));
+                setTotalWithdrawByAsset(wallet, asset, getTotalWithdrawByAsset(wallet, asset).add(order.getAmount()));
+            } else {
+                setFreezeByAsset(wallet, asset, getFreezeByAsset(wallet, asset).subtract(order.getAmount()));
+                setBalanceByAsset(wallet, asset, getBalanceByAsset(wallet, asset).add(order.getAmount()));
+            }
+            userWalletMapper.updateById(wallet);
+        } else if (sourceType == WITHDRAW_SOURCE_MACHINE_REVENUE) {
+            if (request.getStatus() == 2) {
+                rollbackMachineRevenueExtract(order.getId());
+            } else {
+                markMachineRevenueExtractApproved(order.getId());
+            }
         }
-        userWalletMapper.updateById(wallet);
         return buildWithdraw(order);
+    }
+
+    private void rollbackMachineRevenueExtract(Long withdrawOrderId) {
+        if (withdrawOrderId == null) {
+            return;
+        }
+        List<MachineRevenueWithdrawItem> items = machineRevenueWithdrawItemMapper.selectList(
+                new QueryWrapper<MachineRevenueWithdrawItem>()
+                        .eq("withdraw_order_id", withdrawOrderId)
+                        .eq("status", 0)
+        );
+        for (MachineRevenueWithdrawItem item : items) {
+            UserMachineOrder machineOrder = userMachineOrderMapper.selectById(item.getMachineOrderId());
+            if (machineOrder != null) {
+                BigDecimal extracted = machineOrder.getExtractedRevenueCoin() == null
+                        ? BigDecimal.ZERO : machineOrder.getExtractedRevenueCoin();
+                BigDecimal revert = item.getAmountBtc() == null ? BigDecimal.ZERO : item.getAmountBtc();
+                BigDecimal newVal = extracted.subtract(revert);
+                if (newVal.compareTo(BigDecimal.ZERO) < 0) {
+                    newVal = BigDecimal.ZERO;
+                }
+                machineOrder.setExtractedRevenueCoin(newVal.setScale(12, RoundingMode.HALF_UP));
+                userMachineOrderMapper.updateById(machineOrder);
+            }
+            item.setStatus(2);
+            machineRevenueWithdrawItemMapper.updateById(item);
+        }
+    }
+
+    private void markMachineRevenueExtractApproved(Long withdrawOrderId) {
+        if (withdrawOrderId == null) {
+            return;
+        }
+        List<MachineRevenueWithdrawItem> items = machineRevenueWithdrawItemMapper.selectList(
+                new QueryWrapper<MachineRevenueWithdrawItem>()
+                        .eq("withdraw_order_id", withdrawOrderId)
+                        .eq("status", 0)
+        );
+        for (MachineRevenueWithdrawItem item : items) {
+            item.setStatus(1);
+            machineRevenueWithdrawItemMapper.updateById(item);
+        }
     }
 
     @Override
@@ -398,8 +563,19 @@ public class UserWalletServiceImpl implements IUserWalletService {
         if (!StringUtils.hasText(request.getReceiveAddress())) {
             throw new IllegalArgumentException("receiveAddress is required");
         }
+        String withdrawNetwork = request.getNetwork().trim().toUpperCase();
+        Long boundCount = userReceiveAddressMapper.selectCount(
+                new QueryWrapper<UserReceiveAddress>()
+                        .eq("user_id", request.getUserId())
+                        .eq("network", withdrawNetwork)
+                        .eq("receive_address", request.getReceiveAddress().trim())
+                        .eq("status", 1)
+        );
+        if (boundCount == null || boundCount <= 0) {
+            throw new IllegalArgumentException("please bind receive address before withdraw");
+        }
         if (!StringUtils.hasText(request.getWithdrawPassword())) {
-            throw new IllegalArgumentException("withdrawPassword is required");
+            throw new IllegalArgumentException("fundPassword is required");
         }
 
         SysUser user = sysUserMapper.selectById(request.getUserId());
@@ -407,10 +583,70 @@ public class UserWalletServiceImpl implements IUserWalletService {
             throw new IllegalArgumentException("user not found");
         }
         if (!StringUtils.hasText(user.getWithdrawPassword())) {
-            throw new IllegalArgumentException("withdraw password not set, please set it in settings first");
+            throw new IllegalArgumentException("fund password not set, please set it in settings first");
         }
         if (!passwordEncoder.matches(request.getWithdrawPassword().trim(), user.getWithdrawPassword())) {
-            throw new IllegalArgumentException("withdraw password is incorrect");
+            throw new IllegalArgumentException("fund password is incorrect");
+        }
+    }
+
+    private void validateReceiveAddressAddRequest(ReceiveAddressAddRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("request body is required");
+        }
+        if (request.getUserId() == null) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (!StringUtils.hasText(request.getReceiveAddress())) {
+            throw new IllegalArgumentException("receiveAddress is required");
+        }
+        normalizeReceiveAddressNetwork(request.getNetwork());
+        verifyFundPassword(request.getUserId(), request.getFundPassword());
+    }
+
+    private void validateReceiveAddressUpdateRequest(ReceiveAddressUpdateRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("request body is required");
+        }
+        if (request.getUserId() == null) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (request.getId() == null) {
+            throw new IllegalArgumentException("id is required");
+        }
+        if (!StringUtils.hasText(request.getReceiveAddress())) {
+            throw new IllegalArgumentException("receiveAddress is required");
+        }
+        normalizeReceiveAddressNetwork(request.getNetwork());
+        verifyFundPassword(request.getUserId(), request.getFundPassword());
+    }
+
+    private void validateReceiveAddressDeleteRequest(ReceiveAddressDeleteRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("request body is required");
+        }
+        if (request.getUserId() == null) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (request.getId() == null) {
+            throw new IllegalArgumentException("id is required");
+        }
+        verifyFundPassword(request.getUserId(), request.getFundPassword());
+    }
+
+    private void verifyFundPassword(Long userId, String fundPassword) {
+        if (!StringUtils.hasText(fundPassword)) {
+            throw new IllegalArgumentException("fundPassword is required");
+        }
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("user not found");
+        }
+        if (!StringUtils.hasText(user.getWithdrawPassword())) {
+            throw new IllegalArgumentException("fund password not set, please set it in settings first");
+        }
+        if (!passwordEncoder.matches(fundPassword.trim(), user.getWithdrawPassword())) {
+            throw new IllegalArgumentException("fund password is incorrect");
         }
     }
 
@@ -426,6 +662,17 @@ public class UserWalletServiceImpl implements IUserWalletService {
         if (!valid) {
             throw new IllegalArgumentException("invalid asset/network pair");
         }
+    }
+
+    private String normalizeReceiveAddressNetwork(String network) {
+        if (!StringUtils.hasText(network)) {
+            throw new IllegalArgumentException("network is required");
+        }
+        String normalized = network.trim().toUpperCase();
+        if (!"TRC20".equals(normalized) && !"ERC20".equals(normalized) && !"BTC".equals(normalized)) {
+            throw new IllegalArgumentException("network must be one of TRC20/ERC20/BTC");
+        }
+        return normalized;
     }
 
     private void validateAuditRequest(AuditRequest request) {
@@ -630,6 +877,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
         map.put("amount", order.getAmount());
         map.put("amountCny", order.getAmount());
         map.put("receiveAddress", order.getReceiveAddress());
+        map.put("sourceType", order.getSourceType() == null ? WITHDRAW_SOURCE_WALLET : order.getSourceType());
         map.put("status", order.getStatus());
         map.put("auditRemark", order.getAuditRemark());
         map.put("auditTime", order.getAuditTime());
@@ -637,8 +885,21 @@ public class UserWalletServiceImpl implements IUserWalletService {
         return map;
     }
 
+    private Map<String, Object> buildReceiveAddress(UserReceiveAddress item) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", item.getId());
+        map.put("userId", item.getUserId());
+        map.put("network", item.getNetwork());
+        map.put("receiveAddress", item.getReceiveAddress());
+        map.put("remark", item.getRemark());
+        map.put("status", item.getStatus());
+        map.put("createTime", item.getCreateTime());
+        map.put("updateTime", item.getUpdateTime());
+        return map;
+    }
+
     private void processInviteRebate(RechargeOrder order) {
-        // 邀请返利机制已停用：充值审核通过后不再发放返利
+        // Invite rebate is disabled. Keep method for compatibility.
     }
 
     private void grantInviteRebate(Long beneficiaryUserId, Long sourceUserId, RechargeOrder order, int level, BigDecimal rate) {
@@ -784,3 +1045,4 @@ public class UserWalletServiceImpl implements IUserWalletService {
         return amount != null ? amount : amountCny;
     }
 }
+

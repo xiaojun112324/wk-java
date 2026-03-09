@@ -9,19 +9,16 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
-@TableName("withdraw_order")
-public class WithdrawOrder {
+@TableName("machine_revenue_withdraw_item")
+public class MachineRevenueWithdrawItem {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long userId;
-    private String asset;
-    private String network;
-    private BigDecimal amount;
+    private Long withdrawOrderId;
+    private Long machineOrderId;
+    private BigDecimal amountBtc;
     private String receiveAddress;
-    private Integer sourceType;
     private Integer status;
-    private String auditRemark;
-    private Date auditTime;
     private Date createTime;
     private Date updateTime;
 }

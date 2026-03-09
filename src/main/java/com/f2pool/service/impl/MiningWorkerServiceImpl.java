@@ -81,6 +81,7 @@ public class MiningWorkerServiceImpl extends ServiceImpl<MiningWorkerMapper, Min
         BigDecimal todayMinedCoin = sumSettledBtcByDate(userId, LocalDate.now(CN_ZONE));
         BigDecimal yesterdayRevenueCoin = sumSettledBtcByDate(userId, LocalDate.now(CN_ZONE).minusDays(1));
         BigDecimal totalRevenueCoin = sumTotalRevenueCoinByUser(userId);
+        BigDecimal totalWithdrawableRevenueCoin = sumWithdrawableRevenueByUser(userId);
 
         Map<String, Object> result = new HashMap<>();
         result.put("totalWorkers", totalWorkers);
@@ -89,6 +90,7 @@ public class MiningWorkerServiceImpl extends ServiceImpl<MiningWorkerMapper, Min
         result.put("todayMinedCoin", todayMinedCoin);
         result.put("yesterdayRevenueCoin", yesterdayRevenueCoin);
         result.put("totalRevenueCoin", totalRevenueCoin);
+        result.put("totalWithdrawableRevenueCoin", totalWithdrawableRevenueCoin);
         result.put("avgHashrate24h", avgHashrate24h);
         result.put("hashrateUnit", "PH/s");
         result.put("coinSymbol", "BTC");
@@ -142,5 +144,21 @@ public class MiningWorkerServiceImpl extends ServiceImpl<MiningWorkerMapper, Min
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(8, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal sumWithdrawableRevenueByUser(Long userId) {
+        List<UserMachineOrder> orders = userMachineOrderMapper.selectList(
+                new QueryWrapper<UserMachineOrder>().eq("user_id", userId).in("status", 1, 2, 3)
+        );
+        BigDecimal total = BigDecimal.ZERO;
+        for (UserMachineOrder order : orders) {
+            BigDecimal revenue = order.getTotalRevenueCoin() == null ? BigDecimal.ZERO : order.getTotalRevenueCoin();
+            BigDecimal extracted = order.getExtractedRevenueCoin() == null ? BigDecimal.ZERO : order.getExtractedRevenueCoin();
+            BigDecimal can = revenue.subtract(extracted);
+            if (can.compareTo(BigDecimal.ZERO) > 0) {
+                total = total.add(can);
+            }
+        }
+        return total.setScale(8, RoundingMode.HALF_UP);
     }
 }

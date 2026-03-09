@@ -51,7 +51,7 @@ public class AuthController {
         return R.ok(userAuthService.login(request));
     }
 
-    @ApiOperation("根据 token 获取当前用户信息")
+    @ApiOperation("根据 JWT 获取当前用户信息")
     @GetMapping("/me")
     public R<Map<String, Object>> me(@RequestHeader("Authorization") String authorization) {
         String token = jwtTokenUtil.extractToken(authorization);
@@ -65,6 +65,7 @@ public class AuthController {
         if (user == null) {
             throw ApiException.notFound("user not found");
         }
+
         Map<String, Object> data = new HashMap<>();
         data.put("id", user.getId());
         data.put("username", user.getUsername());
@@ -87,7 +88,7 @@ public class AuthController {
         return R.ok(userAuthService.updateLoginPassword(userId, request));
     }
 
-    @ApiOperation("设置/修改提现密码")
+    @ApiOperation("设置/修改资金密码")
     @PostMapping("/password/withdraw/update")
     public R<Map<String, Object>> updateWithdrawPassword(@RequestHeader("Authorization") String authorization,
                                                           @RequestBody UpdateWithdrawPasswordRequest request) {
@@ -95,7 +96,7 @@ public class AuthController {
         return R.ok(userAuthService.updateWithdrawPassword(userId, request));
     }
 
-    @ApiOperation("提现密码设置状态")
+    @ApiOperation("资金密码设置状态")
     @GetMapping("/password/withdraw/status")
     public R<Map<String, Object>> withdrawPasswordStatus(@RequestHeader("Authorization") String authorization) {
         Long userId = tokenContextUtil.requireUserId(authorization);
