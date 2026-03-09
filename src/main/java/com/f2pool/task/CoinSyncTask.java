@@ -15,6 +15,11 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 币种数据同步任务
@@ -27,35 +32,40 @@ public class CoinSyncTask {
     private IMiningCoinService miningCoinService;
 
     // CoinGecko Markets API
-    private static final String MARKETS_API = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=cny&ids=bitcoin,litecoin,dogecoin,bitcoin-cash,ethereum-classic,kaspa,ravencoin,zcash,dash,monero,digibyte,nervos-network,flux,ergo,bitcoin-gold,ethereum-pow-iou";
+    private static final String MARKETS_API_BASE = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=cny&ids=%s";
 
     // Blockchain.info API (BTC 网络统计)
     private static final String BTC_STATS_API = "https://api.blockchain.info/stats";
 
     // BTC.com API (矿池算力统计)
-    private static final String POOL_STATS_API = "https://chain.api.btc.com/v3/pool/stats";
+    private static final String MINING_POOL_STATS_HOME = "https://miningpoolstats.stream";
+    private static final String MINING_POOL_STATS_DATA = "https://data.miningpoolstats.stream/data/coins_data.js?t=%s";
+    private static final String UA = "Mozilla/5.0";
+
+    // 仅保留 OKX + PoW 主流币池（避免垃圾币进入列表）
+    private static final String[] COMMON_POW_SYMBOLS = {
+            "BTC", "LTC", "ETHW", "DOGE", "BCH", "ETC", "KAS", "RVN",
+            "ZEC", "DASH", "XMR", "DGB", "CKB", "FLUX", "ERG", "BTG"
+    };
+
+    private static final Map<String, String> SYMBOL_TO_NAME = buildSymbolToName();
+    private static final Map<String, String> SYMBOL_TO_ALGO = buildSymbolToAlgo();
+    private static final Map<String, String> SYMBOL_TO_PAGE = buildSymbolToPage();
+    private static final Map<String, String> COINGECKO_ID_TO_SYMBOL = buildCoinGeckoIdMap();
+    private static final Map<String, BigDecimal> DAILY_REVENUE_FALLBACK_PER_P = buildDailyRevenueFallbackPerP();
+    private static final Map<String, BigDecimal> POW24_TARGET_CNY = buildPow24TargetCny();
 
     // Mempool.space API (难度调整预测)
     private static final String DIFFICULTY_API = "https://mempool.space/api/v1/mining/difficulty-adjustment";
 
     @PostConstruct
     public void initCoins() {
-        initCoin("BTC", "Bitcoin", "SHA256d");
-        initCoin("LTC", "Litecoin", "Scrypt");
-        initCoin("ETHW", "EthereumPoW", "Ethash");
-        initCoin("DOGE", "Dogecoin", "Scrypt");
-        initCoin("BCH", "Bitcoin Cash", "SHA256d");
-        initCoin("ETC", "Ethereum Classic", "Etchash");
-        initCoin("KAS", "Kaspa", "kHeavyHash");
-        initCoin("RVN", "Ravencoin", "KawPow");
-        initCoin("ZEC", "Zcash", "Equihash");
-        initCoin("DASH", "Dash", "X11");
-        initCoin("XMR", "Monero", "RandomX");
-        initCoin("DGB", "DigiByte", "MultiAlgo");
-        initCoin("CKB", "Nervos", "Eaglesong");
-        initCoin("FLUX", "Flux", "ZelHash");
-        initCoin("ERG", "Ergo", "Autolykos");
-        initCoin("BTG", "Bitcoin Gold", "Equihash");
+        for (String symbol : COMMON_POW_SYMBOLS) {
+            String name = SYMBOL_TO_NAME.getOrDefault(symbol, symbol);
+            String algo = SYMBOL_TO_ALGO.getOrDefault(symbol, "PoW");
+            initCoin(symbol, name, algo);
+        }
+        disableUnsupportedCoins();
     }
 
     private void initCoin(String symbol, String name, String algo) {
@@ -72,6 +82,13 @@ public class CoinSyncTask {
         }
     }
 
+    private void disableUnsupportedCoins() {
+        UpdateWrapper<MiningCoin> wrapper = new UpdateWrapper<>();
+        wrapper.notIn("symbol", (Object[]) COMMON_POW_SYMBOLS);
+        wrapper.set("status", 0);
+        miningCoinService.update(wrapper);
+    }
+
     /**
      * 每分钟同步一次行情数据
      */
@@ -79,7 +96,17 @@ public class CoinSyncTask {
     public void syncCoinMarkets() {
         log.info("开始同步行情数据 [CoinGecko Markets]...");
         try {
-            String result = HttpUtil.get(MARKETS_API, 5000);
+            String ids = COINGECKO_ID_TO_SYMBOL.entrySet().stream()
+                    .filter(e -> containsSymbol(COMMON_POW_SYMBOLS, e.getValue()))
+                    .map(Map.Entry::getKey)
+                    .reduce((a, b) -> a + "," + b)
+                    .orElse("");
+            if (ids.isEmpty()) {
+                log.warn("未配置可用行情币种ID");
+                return;
+            }
+            String marketsApi = String.format(MARKETS_API_BASE, ids);
+            String result = HttpUtil.get(marketsApi, 5000);
             if (result == null || result.isEmpty()) {
                 log.warn("行情接口返回为空");
                 return;
@@ -214,70 +241,143 @@ public class CoinSyncTask {
      */
     @Scheduled(fixedRate = 60000)
     public void syncPoolStats() {
-        log.info("开始同步 F2Pool 矿池算力 [BTC.com]...");
+        log.info("开始同步矿池实时网络数据 [miningpoolstats]...");
         try {
-            String result = HttpUtil.get(POOL_STATS_API, 5000);
-            if (result != null && !result.isEmpty()) {
-                JSONObject json = JSON.parseObject(result);
-                if (json.getInteger("err_no") == 0) {
-                    JSONArray pools = json.getJSONObject("data").getJSONArray("list");
-                    if (pools != null) {
-                        for (int i = 0; i < pools.size(); i++) {
-                            JSONObject pool = pools.getJSONObject(i);
-                            String poolName = pool.getString("relayed_by");
-                            if (poolName != null && poolName.toLowerCase().contains("f2pool")) {
-                                break;
-                            }
-                        }
-                    }
-                }
+            syncPoolStatsFromMiningPoolStats();
+        } catch (Exception e) {
+            log.warn("同步矿池实时数据失败: {}", e.getMessage());
+        }
+    }
+
+    private void syncPoolStatsFromMiningPoolStats() {
+        String home = HttpUtil.createGet(MINING_POOL_STATS_HOME)
+                .header("User-Agent", UA)
+                .timeout(8000)
+                .execute()
+                .body();
+        Matcher matcher = Pattern.compile("coins_data\\.js\\?t=(\\d+)").matcher(home == null ? "" : home);
+        if (!matcher.find()) {
+            throw new RuntimeException("cannot parse miningpoolstats timestamp");
+        }
+
+        String dataUrl = String.format(MINING_POOL_STATS_DATA, matcher.group(1));
+        String dataText = HttpUtil.createGet(dataUrl)
+                .header("User-Agent", UA)
+                .header("Referer", MINING_POOL_STATS_HOME + "/")
+                .timeout(10000)
+                .execute()
+                .body();
+        JSONObject root = JSON.parseObject(dataText);
+        JSONArray data = root.getJSONArray("data");
+        if (data == null || data.isEmpty()) {
+            throw new RuntimeException("miningpoolstats empty data");
+        }
+
+        Map<String, JSONObject> bySymbol = new HashMap<>();
+        Map<String, JSONObject> byPage = new HashMap<>();
+        for (int i = 0; i < data.size(); i++) {
+            JSONObject item = data.getJSONObject(i);
+            if (item == null) {
+                continue;
             }
-        } catch (Exception e) {
-            log.warn("同步矿池算力API失败: {}，转为估算模式", e.getMessage());
+            String symbol = item.getString("symbol");
+            if (symbol == null || symbol.isEmpty()) {
+                continue;
+            }
+            bySymbol.putIfAbsent(symbol.toUpperCase(), item);
+            String page = item.getString("page");
+            if (page != null && !page.isEmpty()) {
+                byPage.put(page.toLowerCase(), item);
+            }
         }
 
-        // 始终执行估算，保证数据连续
-        calculatePoolHashrateFallback();
-    }
+        Map<String, String> preferredPage = new HashMap<>(SYMBOL_TO_PAGE);
+        String[] targets = COMMON_POW_SYMBOLS;
+        int updated = 0;
+        for (String symbol : targets) {
+            String pageKey = preferredPage.get(symbol);
+            JSONObject item = pageKey == null ? null : byPage.get(pageKey);
+            if (item == null) {
+                item = bySymbol.get(symbol);
+            }
+            if (item == null) {
+                continue;
+            }
 
-    private void calculatePoolHashrateFallback() {
-        try {
-            // 传入 mockCoinHashrate 的收益值按每 TH 口径，内部会转每 PH 写库
-            mockCoinHashrate("LTC", new BigDecimal("3.09"), "PH", 0.185, new BigDecimal("1.2"));
-            mockCoinHashrate("DOGE", new BigDecimal("3.08"), "PH", 0.185, new BigDecimal("4320"));
-            mockCoinHashrate("BCH", new BigDecimal("5.96"), "EH", 0.05, new BigDecimal("0.000075"));
-            mockCoinHashrate("ETC", new BigDecimal("160"), "TH", 0.35, new BigDecimal("105"));
-            mockCoinHashrate("KAS", new BigDecimal("427.04"), "PH", 0.15, new BigDecimal("11.18"));
-            mockCoinHashrate("RVN", new BigDecimal("10"), "TH", 0.10, new BigDecimal("600000"));
-            mockCoinHashrate("ETHW", new BigDecimal("20"), "TH", 0.12, new BigDecimal("200"));
-            mockCoinHashrate("ZEC", new BigDecimal("8.5"), "GH", 0.12, new BigDecimal("0.012"));
-            mockCoinHashrate("DASH", new BigDecimal("9.13"), "PH", 0.10, new BigDecimal("0.00004"));
-            mockCoinHashrate("XMR", new BigDecimal("3.6"), "GH", 0.10, new BigDecimal("0.0009"));
-            mockCoinHashrate("DGB", new BigDecimal("440"), "TH", 0.08, new BigDecimal("2.8"));
-            mockCoinHashrate("CKB", new BigDecimal("345.25"), "PH", 0.10, new BigDecimal("65"));
-            mockCoinHashrate("FLUX", new BigDecimal("30"), "TH", 0.10, new BigDecimal("0.85"));
-            mockCoinHashrate("ERG", new BigDecimal("20"), "TH", 0.10, new BigDecimal("1.9"));
-            mockCoinHashrate("BTG", new BigDecimal("4"), "TH", 0.10, new BigDecimal("0.03"));
-        } catch (Exception e) {
-            log.error("矿池算力估算失败: {}", e.getMessage());
+            BigDecimal hashrateH = item.getBigDecimal("hashrate");
+            if (hashrateH == null || hashrateH.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            BigDecimal poolsHashrateH = item.getBigDecimal("ph");
+            BigDecimal e24 = item.getBigDecimal("e24");
+            MiningCoin currentCoin = miningCoinService.query().eq("symbol", symbol).one();
+
+            UpdateWrapper<MiningCoin> wrapper = new UpdateWrapper<>();
+            wrapper.eq("symbol", symbol);
+            wrapper.set("network_hashrate", formatHashrate(hashrateH, "H"));
+            wrapper.set("pool_hashrate", formatHashrate(
+                    poolsHashrateH != null && poolsHashrateH.compareTo(BigDecimal.ZERO) > 0 ? poolsHashrateH : hashrateH, "H"));
+
+            BigDecimal resolvedDailyRevenuePerP = null;
+            if (e24 != null && e24.compareTo(BigDecimal.ZERO) > 0) {
+                resolvedDailyRevenuePerP = e24
+                        .divide(hashrateH, 20, RoundingMode.HALF_UP)
+                        .multiply(new BigDecimal("1000000000000000"))
+                        .setScale(8, RoundingMode.HALF_UP);
+            } else if (POW24_TARGET_CNY.containsKey(symbol)
+                    && currentCoin != null
+                    && currentCoin.getPriceCny() != null
+                    && currentCoin.getPriceCny().compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal networkPh = hashrateH.divide(new BigDecimal("1000000000000000"), 20, RoundingMode.HALF_UP);
+                if (networkPh.compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal targetPow24 = POW24_TARGET_CNY.get(symbol);
+                    resolvedDailyRevenuePerP = targetPow24
+                            .divide(currentCoin.getPriceCny(), 20, RoundingMode.HALF_UP)
+                            .divide(networkPh, 20, RoundingMode.HALF_UP)
+                            .setScale(8, RoundingMode.HALF_UP);
+                }
+            } else if (currentCoin != null
+                    && currentCoin.getDailyRevenuePerP() != null
+                    && currentCoin.getDailyRevenuePerP().compareTo(BigDecimal.ZERO) > 0) {
+                resolvedDailyRevenuePerP = currentCoin.getDailyRevenuePerP();
+            } else {
+                resolvedDailyRevenuePerP = DAILY_REVENUE_FALLBACK_PER_P.get(symbol);
+            }
+            if (resolvedDailyRevenuePerP != null && resolvedDailyRevenuePerP.compareTo(BigDecimal.ZERO) > 0) {
+                wrapper.set("daily_revenue_per_p", resolvedDailyRevenuePerP.setScale(8, RoundingMode.HALF_UP));
+            }
+
+            Long height = item.getLong("height");
+            if (height != null) {
+                wrapper.set("current_block_height", height);
+            }
+
+            BigDecimal diff = item.getBigDecimal("diff");
+            if (diff != null && diff.compareTo(BigDecimal.ZERO) > 0) {
+                wrapper.set("network_difficulty", formatDifficulty(diff));
+            }
+
+            miningCoinService.update(wrapper);
+            updated++;
         }
+
+        log.info("miningpoolstats同步完成，更新币种数: {}", updated);
     }
 
-    private void mockCoinHashrate(String symbol, BigDecimal networkVal, String unit, double share, BigDecimal dailyRevenuePerTh) {
-        UpdateWrapper<MiningCoin> wrapper = new UpdateWrapper<>();
-        wrapper.eq("symbol", symbol);
-
-        double factor = 0.98 + Math.random() * 0.04;
-        BigDecimal finalNet = networkVal.multiply(new BigDecimal(factor)).setScale(2, RoundingMode.HALF_UP);
-
-        wrapper.set("network_hashrate", formatHashrate(finalNet, unit));
-        wrapper.set("pool_hashrate", formatHashrate(finalNet.multiply(new BigDecimal(share)), unit));
-
-        // 每 TH -> 每 PH
-        BigDecimal dailyRevenuePerP = dailyRevenuePerTh.multiply(new BigDecimal("1000")).setScale(8, RoundingMode.HALF_UP);
-        wrapper.set("daily_revenue_per_p", dailyRevenuePerP);
-
-        miningCoinService.update(wrapper);
+    private String formatDifficulty(BigDecimal diff) {
+        BigDecimal t = new BigDecimal("1000000000000");
+        BigDecimal g = new BigDecimal("1000000000");
+        BigDecimal m = new BigDecimal("1000000");
+        if (diff.compareTo(t) >= 0) {
+            return diff.divide(t, 2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + " T";
+        }
+        if (diff.compareTo(g) >= 0) {
+            return diff.divide(g, 2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + " G";
+        }
+        if (diff.compareTo(m) >= 0) {
+            return diff.divide(m, 2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + " M";
+        }
+        return diff.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
     }
 
     private String formatHashrate(BigDecimal value, String unit) {
@@ -316,52 +416,261 @@ public class CoinSyncTask {
         }
     }
 
+    private static Map<String, String> buildSymbolToName() {
+        Map<String, String> map = new LinkedHashMap<>();
+        put(map, "BTC", "Bitcoin");
+        put(map, "LTC", "Litecoin");
+        put(map, "DOGE", "Dogecoin");
+        put(map, "BCH", "Bitcoin Cash");
+        put(map, "ETC", "Ethereum Classic");
+        put(map, "KAS", "Kaspa");
+        put(map, "RVN", "Ravencoin");
+        put(map, "ZEC", "Zcash");
+        put(map, "DASH", "Dash");
+        put(map, "XMR", "Monero");
+        put(map, "DGB", "DigiByte");
+        put(map, "CKB", "Nervos");
+        put(map, "ERG", "Ergo");
+        put(map, "BTG", "Bitcoin Gold");
+        put(map, "ETHW", "EthereumPoW");
+        put(map, "FLUX", "Flux");
+        put(map, "KDA", "Kadena");
+        put(map, "SC", "Siacoin");
+        put(map, "HNS", "Handshake");
+        put(map, "ALPH", "Alephium");
+        put(map, "NEXA", "Nexa");
+        put(map, "ZANO", "Zano");
+        put(map, "FIRO", "Firo");
+        put(map, "VTC", "Vertcoin");
+        put(map, "SYS", "Syscoin");
+        put(map, "QUBIC", "Qubic");
+        put(map, "QKC", "QuarkChain");
+        put(map, "DNX", "Dynex");
+        put(map, "CLO", "Callisto");
+        put(map, "PPC", "Peercoin");
+        put(map, "XVG", "Verge");
+        put(map, "ARRR", "Pirate Chain");
+        put(map, "ZEN", "Horizen");
+        put(map, "NMC", "Namecoin");
+        put(map, "EMC2", "Einsteinium");
+        put(map, "FTC", "Feathercoin");
+        put(map, "VIA", "Viacoin");
+        put(map, "GRIN", "Grin");
+        put(map, "BEAM", "Beam");
+        put(map, "KLS", "Karlsen");
+        put(map, "NEOXA", "Neoxa");
+        put(map, "AIPG", "AIPowerGrid");
+        put(map, "SERO", "SERO");
+        put(map, "RXD", "Radiant");
+        put(map, "MEWC", "MeowCoin");
+        put(map, "ELH", "Elastos Hash");
+        put(map, "XWP", "Swap");
+        put(map, "RTM", "Raptoreum");
+        put(map, "BEL", "Bellscoin");
+        put(map, "XNA", "Neurai");
+        return map;
+    }
+
+    private static Map<String, String> buildSymbolToAlgo() {
+        Map<String, String> map = new HashMap<>();
+        put(map, "BTC", "SHA256d");
+        put(map, "LTC", "Scrypt");
+        put(map, "DOGE", "Scrypt");
+        put(map, "BCH", "SHA256d");
+        put(map, "ETC", "Etchash");
+        put(map, "KAS", "kHeavyHash");
+        put(map, "RVN", "KawPow");
+        put(map, "ZEC", "Equihash");
+        put(map, "DASH", "X11");
+        put(map, "XMR", "RandomX");
+        put(map, "DGB", "MultiAlgo");
+        put(map, "CKB", "Eaglesong");
+        put(map, "ERG", "Autolykos");
+        put(map, "BTG", "Equihash");
+        put(map, "ETHW", "Ethash");
+        put(map, "FLUX", "ZelHash");
+        put(map, "KDA", "Blake2s");
+        put(map, "SC", "Blake2b");
+        put(map, "HNS", "Blake2b+SHA3");
+        put(map, "ALPH", "Blake3");
+        put(map, "NEXA", "NexaPow");
+        put(map, "FIRO", "FiroPoW");
+        put(map, "VTC", "Verthash");
+        put(map, "QUBIC", "Qubic");
+        put(map, "QKC", "Ethash");
+        put(map, "DNX", "DynexSolve");
+        put(map, "CLO", "Ethash");
+        put(map, "XVG", "Scrypt");
+        put(map, "ARRR", "Equihash");
+        put(map, "ZEN", "Equihash");
+        put(map, "NMC", "SHA256d");
+        put(map, "EMC2", "Scrypt");
+        put(map, "FTC", "NeoScrypt");
+        put(map, "VIA", "Scrypt");
+        put(map, "GRIN", "Cuckatoo32");
+        put(map, "BEAM", "BeamHashIII");
+        put(map, "KLS", "KarlsenHash");
+        put(map, "NEOXA", "KawPow");
+        put(map, "AIPG", "YesPower");
+        put(map, "RXD", "SHA512256d");
+        put(map, "MEWC", "KawPow");
+        put(map, "XWP", "Cuckaroo29s");
+        put(map, "RTM", "GhostRider");
+        put(map, "BEL", "Scrypt");
+        put(map, "XNA", "KawPow");
+        return map;
+    }
+
+    private static Map<String, String> buildSymbolToPage() {
+        Map<String, String> map = new HashMap<>();
+        put(map, "BTC", "bitcoin");
+        put(map, "LTC", "litecoin");
+        put(map, "DOGE", "dogecoin");
+        put(map, "BCH", "bitcoincash");
+        put(map, "ETC", "ethereumclassic");
+        put(map, "KAS", "kaspa");
+        put(map, "RVN", "ravencoin");
+        put(map, "ZEC", "zcash");
+        put(map, "DASH", "dash");
+        put(map, "XMR", "monero");
+        put(map, "DGB", "digibyte-sha");
+        put(map, "CKB", "nervos");
+        put(map, "ERG", "ergo");
+        put(map, "BTG", "bitcoingold");
+        put(map, "ETHW", "ethereumpow");
+        put(map, "KDA", "kadena");
+        put(map, "SC", "siacoin");
+        put(map, "HNS", "handshake");
+        put(map, "ALPH", "alephium");
+        put(map, "NEXA", "nexa");
+        put(map, "ZANO", "zano");
+        put(map, "FIRO", "firo");
+        put(map, "VTC", "vertcoin");
+        put(map, "QKC", "quarkchain");
+        put(map, "DNX", "dynex");
+        put(map, "CLO", "callisto");
+        put(map, "XVG", "verge");
+        put(map, "ARRR", "pirate");
+        put(map, "ZEN", "horizen");
+        put(map, "NMC", "namecoin");
+        put(map, "EMC2", "einsteinium");
+        put(map, "FTC", "feathercoin");
+        put(map, "VIA", "viacoin");
+        put(map, "GRIN", "grin");
+        put(map, "BEAM", "beam");
+        put(map, "KLS", "karlsen");
+        put(map, "NEOXA", "neoxa");
+        put(map, "RXD", "radiant");
+        put(map, "RTM", "raptoreum");
+        put(map, "BEL", "bellscoin");
+        put(map, "XNA", "neurai");
+        return map;
+    }
+
+    private static Map<String, String> buildCoinGeckoIdMap() {
+        Map<String, String> map = new LinkedHashMap<>();
+        put(map, "bitcoin", "BTC");
+        put(map, "litecoin", "LTC");
+        put(map, "dogecoin", "DOGE");
+        put(map, "bitcoin-cash", "BCH");
+        put(map, "ethereum-classic", "ETC");
+        put(map, "kaspa", "KAS");
+        put(map, "ravencoin", "RVN");
+        put(map, "zcash", "ZEC");
+        put(map, "dash", "DASH");
+        put(map, "monero", "XMR");
+        put(map, "digibyte", "DGB");
+        put(map, "nervos-network", "CKB");
+        put(map, "ergo", "ERG");
+        put(map, "bitcoin-gold", "BTG");
+        put(map, "ethereum-pow-iou", "ETHW");
+        put(map, "flux", "FLUX");
+        put(map, "kadena", "KDA");
+        put(map, "siacoin", "SC");
+        put(map, "handshake", "HNS");
+        put(map, "alephium", "ALPH");
+        put(map, "nexa", "NEXA");
+        put(map, "zano", "ZANO");
+        put(map, "firo", "FIRO");
+        put(map, "vertcoin", "VTC");
+        put(map, "syscoin", "SYS");
+        put(map, "dynex", "DNX");
+        put(map, "callisto", "CLO");
+        put(map, "peercoin", "PPC");
+        put(map, "verge", "XVG");
+        put(map, "pirate-chain", "ARRR");
+        put(map, "horizen", "ZEN");
+        put(map, "namecoin", "NMC");
+        put(map, "einsteinium", "EMC2");
+        put(map, "feathercoin", "FTC");
+        put(map, "viacoin", "VIA");
+        put(map, "grin", "GRIN");
+        put(map, "beam-2", "BEAM");
+        put(map, "neoxa", "NEOXA");
+        put(map, "radiant-2", "RXD");
+        put(map, "raptoreum", "RTM");
+        put(map, "bellscoin", "BEL");
+        put(map, "neurai", "XNA");
+        return map;
+    }
+
+    private static Map<String, BigDecimal> buildDailyRevenueFallbackPerP() {
+        Map<String, BigDecimal> map = new HashMap<>();
+        putDec(map, "DOGE", "4320000");
+        putDec(map, "ZEC", "12");
+        putDec(map, "DASH", "0.04");
+        putDec(map, "BTG", "30");
+        putDec(map, "ETHW", "200000");
+        return map;
+    }
+
+    private static Map<String, BigDecimal> buildPow24TargetCny() {
+        Map<String, BigDecimal> map = new HashMap<>();
+        putDec(map, "DOGE", "9000000");
+        putDec(map, "ZEC", "2000000");
+        putDec(map, "ETHW", "20000");
+        putDec(map, "DASH", "50000");
+        return map;
+    }
+
+    private static void put(Map<String, String> map, String key, String value) {
+        map.put(key, value);
+    }
+
+    private static void putDec(Map<String, BigDecimal> map, String key, String value) {
+        map.put(key, new BigDecimal(value));
+    }
+
+    private static boolean containsSymbol(String[] arr, String symbol) {
+        if (symbol == null) {
+            return false;
+        }
+        for (String s : arr) {
+            if (symbol.equalsIgnoreCase(s)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void updateMarketData(JSONObject data) {
         if (data == null) {
             return;
         }
 
         String id = data.getString("id");
-        String symbol = "";
-        if ("bitcoin".equals(id)) {
-            symbol = "BTC";
-        } else if ("litecoin".equals(id)) {
-            symbol = "LTC";
-        } else if ("ethereum-pow-iou".equals(id)) {
-            symbol = "ETHW";
-        } else if ("dogecoin".equals(id)) {
-            symbol = "DOGE";
-        } else if ("bitcoin-cash".equals(id)) {
-            symbol = "BCH";
-        } else if ("ethereum-classic".equals(id)) {
-            symbol = "ETC";
-        } else if ("kaspa".equals(id)) {
-            symbol = "KAS";
-        } else if ("ravencoin".equals(id)) {
-            symbol = "RVN";
-        } else if ("zcash".equals(id)) {
-            symbol = "ZEC";
-        } else if ("dash".equals(id)) {
-            symbol = "DASH";
-        } else if ("monero".equals(id)) {
-            symbol = "XMR";
-        } else if ("digibyte".equals(id)) {
-            symbol = "DGB";
-        } else if ("nervos-network".equals(id)) {
-            symbol = "CKB";
-        } else if ("flux".equals(id)) {
-            symbol = "FLUX";
-        } else if ("ergo".equals(id)) {
-            symbol = "ERG";
-        } else if ("bitcoin-gold".equals(id)) {
-            symbol = "BTG";
-        } else {
+        String symbol = COINGECKO_ID_TO_SYMBOL.get(id);
+        if (symbol == null || symbol.isEmpty()) {
             return;
         }
 
         UpdateWrapper<MiningCoin> updateWrapper = new UpdateWrapper<>();
         updateWrapper.eq("symbol", symbol);
-        updateWrapper.set("logo", data.getString("image"));
+        String logo = data.getString("image");
+        if (logo == null || logo.trim().isEmpty()) {
+            logo = "https://dummyimage.com/88x88/e6eefc/3e5f8f.png&text=" + symbol;
+        }
+        updateWrapper.set("logo", logo);
         updateWrapper.set("price_cny", data.getBigDecimal("current_price"));
         updateWrapper.set("market_cap", data.getBigDecimal("market_cap"));
         updateWrapper.set("total_volume", data.getBigDecimal("total_volume"));
