@@ -3,6 +3,7 @@ package com.f2pool.controller;
 import com.f2pool.common.ApiException;
 import com.f2pool.common.JwtTokenUtil;
 import com.f2pool.common.R;
+import com.f2pool.common.TokenContextUtil;
 import com.f2pool.dto.auth.AdminLoginRequest;
 import com.f2pool.dto.auth.AdminRegisterRequest;
 import com.f2pool.entity.AdminUser;
@@ -33,29 +34,28 @@ public class AdminAuthController {
     private JwtTokenUtil jwtTokenUtil;
     @Autowired
     private AdminUserMapper adminUserMapper;
+    @Autowired
+    private TokenContextUtil tokenContextUtil;
 
-    @ApiOperation("管理员注册（账号/邮箱/密码/系统邀请码）")
+    @ApiOperation("管理员注册")
     @PostMapping("/register")
     public R<Map<String, Object>> register(@RequestBody AdminRegisterRequest request) {
         return R.ok(adminAuthService.register(request));
     }
 
-    @ApiOperation("管理员登录（账号或邮箱+密码）")
+    @ApiOperation("管理员登录")
     @PostMapping("/login")
     public R<Map<String, Object>> login(@RequestBody AdminLoginRequest request) {
         return R.ok(adminAuthService.login(request));
     }
 
-    @ApiOperation("根据 token 获取当前管理员信息")
+    @ApiOperation("获取当前管理员信息")
     @GetMapping("/me")
     public R<Map<String, Object>> me(@RequestHeader("Authorization") String authorization) {
+        Long userId = tokenContextUtil.requireAdminId(authorization);
         String token = jwtTokenUtil.extractToken(authorization);
         Claims claims = jwtTokenUtil.parseClaims(token);
-        Object uid = claims.get("uid");
-        if (uid == null) {
-            throw ApiException.unauthorized("invalid token: uid missing");
-        }
-        Long userId = Long.valueOf(String.valueOf(uid));
+
         AdminUser user = adminUserMapper.selectById(userId);
         if (user == null) {
             throw ApiException.notFound("admin user not found");
@@ -71,3 +71,4 @@ public class AdminAuthController {
         return R.ok(data);
     }
 }
+

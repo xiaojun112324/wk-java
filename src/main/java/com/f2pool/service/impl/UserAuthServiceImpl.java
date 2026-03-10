@@ -11,6 +11,7 @@ import com.f2pool.dto.auth.UpdateWithdrawPasswordRequest;
 import com.f2pool.entity.SysUser;
 import com.f2pool.mapper.SysUserMapper;
 import com.f2pool.service.IUserAuthService;
+import com.f2pool.service.UserFeatureRestrictionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,8 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     @Autowired
     private JwtTokenUtil jwtTokenUtil;
+    @Autowired
+    private UserFeatureRestrictionService userFeatureRestrictionService;
 
     @Override
     public Map<String, Object> register(RegisterRequest request) {
@@ -109,6 +112,7 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
         if (user.getStatus() == null || user.getStatus() != 1) {
             throw ApiException.forbidden("account is disabled");
         }
+        userFeatureRestrictionService.assertLoginAllowed(user.getId());
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw ApiException.unauthorized("password is incorrect");
         }
@@ -166,7 +170,7 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
                 throw new IllegalArgumentException("oldPassword is required");
             }
             if (!passwordEncoder.matches(request.getOldPassword().trim(), user.getWithdrawPassword())) {
-                throw ApiException.badRequest("old withdraw password is incorrect");
+                throw ApiException.badRequest("old fund password is incorrect");
             }
         }
 

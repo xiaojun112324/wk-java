@@ -100,6 +100,11 @@ public class GlobalExceptionHandler {
         MESSAGE_I18N_MAP.put("invalid token", "无效的登录令牌");
         MESSAGE_I18N_MAP.put("token expired", "登录已过期，请重新登录");
         MESSAGE_I18N_MAP.put("token is required", "登录令牌不能为空");
+        MESSAGE_I18N_MAP.put("old withdraw password is incorrect", "\u65e7\u8d44\u91d1\u5bc6\u7801\u9519\u8bef");
+        MESSAGE_I18N_MAP.put("old fund password is incorrect", "\u65e7\u8d44\u91d1\u5bc6\u7801\u9519\u8bef");
+        MESSAGE_I18N_MAP.put("no machine order found", "\u672a\u627e\u5230\u7b97\u529b\u8ba2\u5355");
+        MESSAGE_I18N_MAP.put("machine not found", "\u7b97\u529b\u4e0d\u5b58\u5728");
+        MESSAGE_I18N_MAP.put("machine is not on sale", "\u7b97\u529b\u672a\u4e0a\u67b6");
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

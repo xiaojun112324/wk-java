@@ -11,6 +11,7 @@ import com.f2pool.entity.SysConfig;
 import com.f2pool.mapper.AdminUserMapper;
 import com.f2pool.mapper.SysConfigMapper;
 import com.f2pool.service.IAdminAuthService;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser> implements IAdminAuthService {
 
     private static final String ADMIN_REGISTER_INVITE_CODE_KEY = "admin_register_invite_code";
+    private static final String ADMIN_SESSION_TOKEN_KEY_PREFIX = "f2pool:admin:session:token:";
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -30,6 +32,8 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
     private SysConfigMapper sysConfigMapper;
     @Autowired
     private JwtTokenUtil jwtTokenUtil;
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Map<String, Object> register(AdminRegisterRequest request) {
@@ -78,7 +82,9 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
         save(user);
 
         Map<String, Object> result = new HashMap<>();
-        result.put("token", jwtTokenUtil.generateToken(user.getId(), user.getUsername(), "ADMIN"));
+        String token = jwtTokenUtil.generateToken(user.getId(), user.getUsername(), "ADMIN");
+        storeAdminSessionToken(user.getId(), token);
+        result.put("token", token);
         result.put("tokenType", "Bearer");
         result.put("expiresIn", jwtTokenUtil.getExpireSeconds());
         result.put("user", buildUserInfo(user));
@@ -114,11 +120,21 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
         }
 
         Map<String, Object> result = new HashMap<>();
-        result.put("token", jwtTokenUtil.generateToken(user.getId(), user.getUsername(), "ADMIN"));
+        String token = jwtTokenUtil.generateToken(user.getId(), user.getUsername(), "ADMIN");
+        storeAdminSessionToken(user.getId(), token);
+        result.put("token", token);
         result.put("tokenType", "Bearer");
         result.put("expiresIn", jwtTokenUtil.getExpireSeconds());
         result.put("user", buildUserInfo(user));
         return result;
+    }
+
+    private void storeAdminSessionToken(Long adminId, String token) {
+        if (adminId == null || !StringUtils.hasText(token)) {
+            return;
+        }
+        String key = ADMIN_SESSION_TOKEN_KEY_PREFIX + adminId;
+        stringRedisTemplate.opsForValue().set(key, token, jwtTokenUtil.getExpireSeconds(), java.util.concurrent.TimeUnit.SECONDS);
     }
 
     private String getAdminRegisterInviteCode() {

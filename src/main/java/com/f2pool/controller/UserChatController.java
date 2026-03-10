@@ -56,7 +56,7 @@ public class UserChatController {
         return R.ok(customerChatService.sendUserMessage(
                 userId,
                 request == null ? null : request.getRoomId(),
-                request == null ? null : request.getMessageType(),
+                request == null ? null : request.resolveMessageType(),
                 request == null ? null : request.getMessageContent()
         ));
     }

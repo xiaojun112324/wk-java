@@ -58,7 +58,7 @@ public class AdminChatController {
         return R.ok(customerChatService.sendAdminMessage(
                 adminId,
                 request == null ? null : request.getRoomId(),
-                request == null ? null : request.getMessageType(),
+                request == null ? null : request.resolveMessageType(),
                 request == null ? null : request.getMessageContent()
         ));
     }

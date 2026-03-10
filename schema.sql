@@ -179,6 +179,28 @@ CREATE TABLE `withdraw_order` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='withdraw order ticket';
 
 -- ----------------------------
+-- Table structure for user_feature_restriction
+-- ----------------------------
+DROP TABLE IF EXISTS `user_feature_restriction`;
+CREATE TABLE `user_feature_restriction` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) NOT NULL COMMENT 'user id',
+  `disable_login` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 deny login',
+  `disable_recharge` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 deny recharge',
+  `disable_withdraw` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 deny withdraw',
+  `disable_order` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 deny order create',
+  `disable_sell_recover` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 deny sell/recover',
+  `disable_revenue_withdraw` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 deny revenue withdraw',
+  `disable_chat_send` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 deny chat send',
+  `remark` varchar(255) DEFAULT NULL COMMENT 'remark',
+  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '1 active 0 disabled',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_status` (`user_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='user feature restriction';
+
+-- ----------------------------
 -- Table structure for invite_rebate_order
 -- ----------------------------
 DROP TABLE IF EXISTS `invite_rebate_order`;

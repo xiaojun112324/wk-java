@@ -24,6 +24,7 @@ import com.f2pool.service.IMiningCoinService;
 import com.f2pool.service.IMiningMachineService;
 import com.f2pool.service.IUserMachineOrderService;
 import com.f2pool.service.IUserWalletService;
+import com.f2pool.service.UserFeatureRestrictionService;
 import com.f2pool.util.HashrateUnitUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,9 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -46,6 +50,10 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     private static final BigDecimal TH_PER_PH = new BigDecimal("1000");
     private static final String PRICE_PER_P_USD_KEY = "machine_price_per_p_usd";
     private static final int WITHDRAW_SOURCE_MACHINE_REVENUE = 2;
+    private static final ZoneId CN_ZONE = ZoneId.of("Asia/Shanghai");
+    private static final int RECOVER_LOCK_DAYS = 180;
+    private static final int FULL_REFUND_DAYS = 365;
+    private static final BigDecimal EARLY_RECOVER_RATE = new BigDecimal("0.97");
 
     @Autowired
     private IMiningMachineService miningMachineService;
@@ -63,11 +71,14 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     private WithdrawOrderMapper withdrawOrderMapper;
     @Autowired
     private MachineRevenueWithdrawItemMapper machineRevenueWithdrawItemMapper;
+    @Autowired
+    private UserFeatureRestrictionService userFeatureRestrictionService;
 
     @Override
     @Transactional
     public Map<String, Object> createOrder(UserMachineOrderCreateRequest request) {
         validateRequest(request);
+        userFeatureRestrictionService.assertOrderAllowed(request.getUserId());
 
         MiningMachine machine = miningMachineService.getById(request.getMachineId());
         if (machine == null) {
@@ -114,10 +125,11 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     @Transactional
     public Map<String, Object> createOrderByP(UserMachineOrderBuyByPRequest request) {
         validateBuyByPRequest(request);
+        userFeatureRestrictionService.assertOrderAllowed(request.getUserId());
 
         String symbol = request.getCoinSymbol().trim().toUpperCase();
         if (!"BTC".equals(symbol)) {
-            throw new IllegalArgumentException("暂未开通此矿池");
+            throw new IllegalArgumentException("鏆傛湭寮€閫氭鐭挎睜");
         }
         BigDecimal pricePerPUsd = getConfigDecimal(PRICE_PER_P_USD_KEY);
         if (pricePerPUsd.compareTo(BigDecimal.ZERO) <= 0) {
@@ -151,7 +163,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         order.setUserId(request.getUserId());
         order.setMachineId(0L);
         order.setCoinSymbol(symbol);
-        order.setMachineName(symbol + " P合同");
+        order.setMachineName(symbol + " P鍚堝悓");
         order.setHashrateValue(pCount);
         order.setHashrateUnit("PH");
         order.setQuantity(1);
@@ -164,7 +176,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         order.setTotalRevenueCny(BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP));
         order.setExtractedRevenueCoin(BigDecimal.ZERO.setScale(12, RoundingMode.HALF_UP));
         order.setReceiveAddress(request.getReceiveAddress().trim());
-        order.setLockUntil(new Date(System.currentTimeMillis() + 30L * 24L * 60L * 60L * 1000L));
+        order.setLockUntil(new Date(System.currentTimeMillis() + RECOVER_LOCK_DAYS * 24L * 60L * 60L * 1000L));
         order.setSellAmountCny(BigDecimal.ZERO.setScale(8, RoundingMode.HALF_UP));
         order.setStatus(1);
         save(order);
@@ -212,12 +224,20 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     @Transactional
     public Map<String, Object> sell(Long id, UserMachineOrderActionRequest request) {
         UserMachineOrder order = getOrderForOperate(id, request);
-        if (order.getLockUntil() != null && new Date().before(order.getLockUntil())) {
-            throw new IllegalArgumentException("订单仍在锁仓期，暂不能回收算力");
+        userFeatureRestrictionService.assertSellRecoverAllowed(order.getUserId());
+        Date now = new Date();
+        long holdDays = calcHoldDays(order.getCreateTime(), now);
+        if (holdDays < RECOVER_LOCK_DAYS) {
+            long remainDays = RECOVER_LOCK_DAYS - holdDays;
+            throw new IllegalArgumentException("还剩" + remainDays + "天可回收");
         }
-        BigDecimal settleAmount = safe(order.getTotalInvest()).setScale(8, RoundingMode.HALF_UP);
+
+        BigDecimal baseAmount = safe(order.getTotalInvest()).setScale(8, RoundingMode.HALF_UP);
+        BigDecimal settleAmount = holdDays >= FULL_REFUND_DAYS
+                ? baseAmount
+                : baseAmount.multiply(EARLY_RECOVER_RATE).setScale(8, RoundingMode.HALF_UP);
         order.setSellAmountCny(settleAmount);
-        order.setSellTime(new Date());
+        order.setSellTime(now);
         order.setStatus(2);
         updateById(order);
         userWalletService.increaseBalance(order.getUserId(), "USDT", settleAmount);
@@ -308,6 +328,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         if (!request.getUserId().equals(order.getUserId())) {
             throw new IllegalArgumentException("order does not belong to this user");
         }
+        userFeatureRestrictionService.assertRevenueWithdrawAllowed(order.getUserId());
         BigDecimal withdrawable = getWithdrawableRevenue(order);
         if (withdrawable.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("no withdrawable revenue");
@@ -340,6 +361,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         if (request == null || request.getUserId() == null) {
             throw new IllegalArgumentException("userId is required");
         }
+        userFeatureRestrictionService.assertRevenueWithdrawAllowed(request.getUserId());
         List<UserMachineOrder> allOrders = list(new QueryWrapper<UserMachineOrder>()
                 .eq("user_id", request.getUserId())
                 .in("status", 1, 2, 3)
@@ -595,6 +617,16 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         return value == null ? BigDecimal.ZERO : value;
     }
 
+    private long calcHoldDays(Date createTime, Date now) {
+        if (createTime == null || now == null) {
+            return Long.MAX_VALUE;
+        }
+        LocalDate start = createTime.toInstant().atZone(CN_ZONE).toLocalDate();
+        LocalDate end = now.toInstant().atZone(CN_ZONE).toLocalDate();
+        long days = ChronoUnit.DAYS.between(start, end);
+        return Math.max(0, days);
+    }
+
     private Map<String, Object> buildOrderView(UserMachineOrder order) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", order.getId());
@@ -623,3 +655,4 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         return map;
     }
 }
+

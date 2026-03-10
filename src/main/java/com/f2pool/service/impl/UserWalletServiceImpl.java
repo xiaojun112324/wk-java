@@ -29,6 +29,7 @@ import com.f2pool.mapper.UserReceiveAddressMapper;
 import com.f2pool.mapper.UserWalletMapper;
 import com.f2pool.mapper.WithdrawOrderMapper;
 import com.f2pool.service.IUserWalletService;
+import com.f2pool.service.UserFeatureRestrictionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -76,6 +77,8 @@ public class UserWalletServiceImpl implements IUserWalletService {
     private MiningCoinMapper miningCoinMapper;
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+    @Autowired
+    private UserFeatureRestrictionService userFeatureRestrictionService;
 
     @Override
     public Map<String, Object> getWallet(Long userId) {
@@ -99,6 +102,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Transactional
     public Map<String, Object> submitRecharge(RechargeSubmitRequest request) {
         validateRechargeRequest(request);
+        userFeatureRestrictionService.assertRechargeAllowed(request.getUserId());
         RechargeOrder order = new RechargeOrder();
         order.setUserId(request.getUserId());
         order.setAsset(request.getAsset().trim().toUpperCase());
@@ -114,6 +118,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Transactional
     public Map<String, Object> submitWithdraw(WithdrawSubmitRequest request) {
         validateWithdrawRequest(request);
+        userFeatureRestrictionService.assertWithdrawAllowed(request.getUserId());
         String asset = normalizeAsset(request.getAsset());
         BigDecimal amount = resolveAmount(request.getAmount(), request.getAmountCny());
         UserWallet wallet = getOrCreateWallet(request.getUserId());
@@ -274,6 +279,40 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Override
     public List<Map<String, Object>> listWithdrawPending() {
         List<WithdrawOrder> list = withdrawOrderMapper.selectList(new QueryWrapper<WithdrawOrder>().eq("status", 0).orderByAsc("id"));
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (WithdrawOrder item : list) {
+            result.add(buildWithdraw(item));
+        }
+        return result;
+    }
+
+    @Override
+    public List<Map<String, Object>> listRechargeForAdmin(Integer status, Long userId) {
+        QueryWrapper<RechargeOrder> wrapper = new QueryWrapper<RechargeOrder>().orderByDesc("id");
+        if (status != null) {
+            wrapper.eq("status", status);
+        }
+        if (userId != null) {
+            wrapper.eq("user_id", userId);
+        }
+        List<RechargeOrder> list = rechargeOrderMapper.selectList(wrapper);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (RechargeOrder item : list) {
+            result.add(buildRecharge(item));
+        }
+        return result;
+    }
+
+    @Override
+    public List<Map<String, Object>> listWithdrawForAdmin(Integer status, Long userId) {
+        QueryWrapper<WithdrawOrder> wrapper = new QueryWrapper<WithdrawOrder>().orderByDesc("id");
+        if (status != null) {
+            wrapper.eq("status", status);
+        }
+        if (userId != null) {
+            wrapper.eq("user_id", userId);
+        }
+        List<WithdrawOrder> list = withdrawOrderMapper.selectList(wrapper);
         List<Map<String, Object>> result = new ArrayList<>();
         for (WithdrawOrder item : list) {
             result.add(buildWithdraw(item));

@@ -36,6 +36,10 @@ public interface IUserWalletService {
 
     List<Map<String, Object>> listWithdrawPending();
 
+    List<Map<String, Object>> listRechargeForAdmin(Integer status, Long userId);
+
+    List<Map<String, Object>> listWithdrawForAdmin(Integer status, Long userId);
+
     Map<String, Object> auditRecharge(Long id, AuditRequest request);
 
     Map<String, Object> auditWithdraw(Long id, AuditRequest request);

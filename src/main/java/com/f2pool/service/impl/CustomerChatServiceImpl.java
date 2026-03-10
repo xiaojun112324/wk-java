@@ -12,6 +12,7 @@ import com.f2pool.mapper.CustomerChatMessageMapper;
 import com.f2pool.mapper.CustomerChatRoomMapper;
 import com.f2pool.mapper.SysUserMapper;
 import com.f2pool.service.ICustomerChatService;
+import com.f2pool.service.UserFeatureRestrictionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,8 @@ public class CustomerChatServiceImpl implements ICustomerChatService {
     private SysUserMapper sysUserMapper;
     @Autowired
     private AdminUserMapper adminUserMapper;
+    @Autowired
+    private UserFeatureRestrictionService userFeatureRestrictionService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -76,6 +79,7 @@ public class CustomerChatServiceImpl implements ICustomerChatService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> sendUserMessage(Long userId, Long roomId, Integer messageType, String messageContent) {
         CustomerChatRoom room = requireUserRoom(userId, roomId);
+        userFeatureRestrictionService.assertChatSendAllowed(userId);
         int safeType = normalizeMessageType(messageType);
         String safeContent = normalizeContent(messageContent);
 
