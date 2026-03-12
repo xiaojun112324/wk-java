@@ -47,7 +47,7 @@ public class CustomerChatServiceImpl implements ICustomerChatService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> initUserRoom(Long userId) {
         if (userId == null) {
-            throw ApiException.badRequest("userId is required");
+            throw ApiException.badRequest("用户编号不能为空");
         }
 
         CustomerChatRoom room = roomMapper.selectOne(new QueryWrapper<CustomerChatRoom>()
@@ -119,7 +119,7 @@ public class CustomerChatServiceImpl implements ICustomerChatService {
     @Override
     public List<Map<String, Object>> listAdminRooms(Long adminId, String keyword) {
         if (adminId == null) {
-            throw ApiException.unauthorized("invalid admin token");
+            throw ApiException.unauthorized("无效的管理员令牌");
         }
         List<CustomerChatRoom> rooms = roomMapper.selectList(new QueryWrapper<CustomerChatRoom>()
                 .eq("status", 1)
@@ -218,31 +218,31 @@ public class CustomerChatServiceImpl implements ICustomerChatService {
 
     private CustomerChatRoom requireUserRoom(Long userId, Long roomId) {
         if (userId == null) {
-            throw ApiException.unauthorized("invalid user token");
+            throw ApiException.unauthorized("无效的用户令牌");
         }
         if (roomId == null) {
-            throw ApiException.badRequest("roomId is required");
+            throw ApiException.badRequest("会话编号不能为空");
         }
         CustomerChatRoom room = roomMapper.selectById(roomId);
         if (room == null || room.getStatus() == null || room.getStatus() != 1) {
-            throw ApiException.notFound("chat room not found");
+            throw ApiException.notFound("会话不存在");
         }
         if (!String.valueOf(userId).equals(String.valueOf(room.getUserId()))) {
-            throw ApiException.forbidden("chat room does not belong to this user");
+            throw ApiException.forbidden("该会话不属于当前用户");
         }
         return room;
     }
 
     private CustomerChatRoom requireAdminRoom(Long adminId, Long roomId) {
         if (adminId == null) {
-            throw ApiException.unauthorized("invalid admin token");
+            throw ApiException.unauthorized("无效的管理员令牌");
         }
         if (roomId == null) {
-            throw ApiException.badRequest("roomId is required");
+            throw ApiException.badRequest("会话编号不能为空");
         }
         CustomerChatRoom room = roomMapper.selectById(roomId);
         if (room == null || room.getStatus() == null || room.getStatus() != 1) {
-            throw ApiException.notFound("chat room not found");
+            throw ApiException.notFound("会话不存在");
         }
         return room;
     }
@@ -268,11 +268,11 @@ public class CustomerChatServiceImpl implements ICustomerChatService {
 
     private String normalizeContent(String content) {
         if (!StringUtils.hasText(content)) {
-            throw ApiException.badRequest("messageContent is required");
+            throw ApiException.badRequest("消息内容不能为空");
         }
         String value = content.trim();
         if (value.length() > 2000) {
-            throw ApiException.badRequest("messageContent is too long");
+            throw ApiException.badRequest("消息内容过长");
         }
         return value;
     }

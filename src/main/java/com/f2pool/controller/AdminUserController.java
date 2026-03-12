@@ -93,17 +93,17 @@ public class AdminUserController {
                                                @RequestBody AdminUserStatusUpdateRequest request) {
         tokenContextUtil.requireAdminId(authorization);
         if (id == null) {
-            throw new IllegalArgumentException("id is required");
+            throw new IllegalArgumentException("编号不能为空");
         }
         if (request == null || request.getStatus() == null) {
-            throw new IllegalArgumentException("status is required");
+            throw new IllegalArgumentException("状态不能为空");
         }
         if (request.getStatus() != 0 && request.getStatus() != 1) {
-            throw new IllegalArgumentException("status must be 0 or 1");
+            throw new IllegalArgumentException("状态必须是0或1");
         }
         SysUser user = sysUserMapper.selectById(id);
         if (user == null) {
-            throw new IllegalArgumentException("user not found");
+            throw new IllegalArgumentException("用户不存在");
         }
         user.setStatus(request.getStatus());
         sysUserMapper.updateById(user);
@@ -117,17 +117,17 @@ public class AdminUserController {
                                                       @RequestBody AdminResetPasswordRequest request) {
         tokenContextUtil.requireAdminId(authorization);
         if (id == null) {
-            throw new IllegalArgumentException("id is required");
+            throw new IllegalArgumentException("编号不能为空");
         }
         if (request == null || !StringUtils.hasText(request.getNewPassword())) {
-            throw new IllegalArgumentException("newPassword is required");
+            throw new IllegalArgumentException("新密码不能为空");
         }
         if (request.getNewPassword().trim().length() < 6) {
-            throw new IllegalArgumentException("newPassword must be at least 6 characters");
+            throw new IllegalArgumentException("新密码长度不能少于6位");
         }
         SysUser user = sysUserMapper.selectById(id);
         if (user == null) {
-            throw new IllegalArgumentException("user not found");
+            throw new IllegalArgumentException("用户不存在");
         }
         user.setPassword(passwordEncoder.encode(request.getNewPassword().trim()));
         sysUserMapper.updateById(user);
@@ -145,17 +145,17 @@ public class AdminUserController {
                                                      @RequestBody AdminResetPasswordRequest request) {
         tokenContextUtil.requireAdminId(authorization);
         if (id == null) {
-            throw new IllegalArgumentException("id is required");
+            throw new IllegalArgumentException("编号不能为空");
         }
         if (request == null || !StringUtils.hasText(request.getNewPassword())) {
-            throw new IllegalArgumentException("newPassword is required");
+            throw new IllegalArgumentException("新密码不能为空");
         }
         if (request.getNewPassword().trim().length() < 6) {
-            throw new IllegalArgumentException("newPassword must be at least 6 characters");
+            throw new IllegalArgumentException("新密码长度不能少于6位");
         }
         SysUser user = sysUserMapper.selectById(id);
         if (user == null) {
-            throw new IllegalArgumentException("user not found");
+            throw new IllegalArgumentException("用户不存在");
         }
         user.setWithdrawPassword(passwordEncoder.encode(request.getNewPassword().trim()));
         sysUserMapper.updateById(user);

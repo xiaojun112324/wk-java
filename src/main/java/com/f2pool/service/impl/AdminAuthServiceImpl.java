@@ -38,27 +38,27 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
     @Override
     public Map<String, Object> register(AdminRegisterRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (!StringUtils.hasText(request.getUsername())) {
-            throw new IllegalArgumentException("username is required");
+            throw new IllegalArgumentException("用户名不能为空");
         }
         if (!StringUtils.hasText(request.getEmail())) {
-            throw new IllegalArgumentException("email is required");
+            throw new IllegalArgumentException("邮箱不能为空");
         }
         if (!StringUtils.hasText(request.getPassword())) {
-            throw new IllegalArgumentException("password is required");
+            throw new IllegalArgumentException("密码不能为空");
         }
         if (!StringUtils.hasText(request.getRegisterInviteCode())) {
-            throw new IllegalArgumentException("registerInviteCode is required");
+            throw new IllegalArgumentException("注册邀请码不能为空");
         }
         if (request.getPassword().length() < 6) {
-            throw new IllegalArgumentException("password must be at least 6 characters");
+            throw new IllegalArgumentException("密码长度不能少于6位");
         }
 
         String expectedInviteCode = getAdminRegisterInviteCode();
         if (!expectedInviteCode.equals(request.getRegisterInviteCode().trim())) {
-            throw ApiException.forbidden("register invite code is incorrect");
+            throw ApiException.forbidden("注册邀请码错误");
         }
 
         String username = request.getUsername().trim();
@@ -94,13 +94,13 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
     @Override
     public Map<String, Object> login(AdminLoginRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (!StringUtils.hasText(request.getAccount())) {
-            throw new IllegalArgumentException("account is required");
+            throw new IllegalArgumentException("账号不能为空");
         }
         if (!StringUtils.hasText(request.getPassword())) {
-            throw new IllegalArgumentException("password is required");
+            throw new IllegalArgumentException("密码不能为空");
         }
 
         String account = request.getAccount().trim();
@@ -110,13 +110,13 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
         );
 
         if (user == null) {
-            throw ApiException.notFound("admin user not found");
+            throw ApiException.notFound("管理员不存在");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
-            throw ApiException.forbidden("admin account is disabled");
+            throw ApiException.forbidden("管理员账号已禁用");
         }
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw ApiException.unauthorized("password is incorrect");
+            throw ApiException.unauthorized("密码错误");
         }
 
         Map<String, Object> result = new HashMap<>();
@@ -144,7 +144,7 @@ public class AdminAuthServiceImpl extends ServiceImpl<AdminUserMapper, AdminUser
                         .eq("status", 1)
         );
         if (config == null || !StringUtils.hasText(config.getConfigValue())) {
-            throw new IllegalArgumentException("admin register invite code is not configured");
+            throw new IllegalArgumentException("未配置管理员注册邀请码");
         }
         return config.getConfigValue().trim();
     }

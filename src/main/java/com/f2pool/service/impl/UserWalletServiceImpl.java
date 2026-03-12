@@ -83,7 +83,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Override
     public Map<String, Object> getWallet(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         UserWallet wallet = getOrCreateWallet(userId);
         return buildWallet(wallet);
@@ -123,7 +123,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
         BigDecimal amount = resolveAmount(request.getAmount(), request.getAmountCny());
         UserWallet wallet = getOrCreateWallet(request.getUserId());
         if (getBalanceByAsset(wallet, asset).compareTo(amount) < 0) {
-            throw new IllegalArgumentException("insufficient balance");
+            throw new IllegalArgumentException("余额不足");
         }
         setBalanceByAsset(wallet, asset, getBalanceByAsset(wallet, asset).subtract(amount));
         setFreezeByAsset(wallet, asset, getFreezeByAsset(wallet, asset).add(amount));
@@ -155,7 +155,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
                         .eq("status", 1)
         );
         if (exists != null && exists > 0) {
-            throw new IllegalArgumentException("receive address already exists");
+            throw new IllegalArgumentException("收款地址已存在");
         }
         UserReceiveAddress entity = new UserReceiveAddress();
         entity.setUserId(request.getUserId());
@@ -173,10 +173,10 @@ public class UserWalletServiceImpl implements IUserWalletService {
         validateReceiveAddressUpdateRequest(request);
         UserReceiveAddress current = userReceiveAddressMapper.selectById(request.getId());
         if (current == null || current.getStatus() == null || current.getStatus() != 1) {
-            throw new IllegalArgumentException("receive address not found");
+            throw new IllegalArgumentException("收款地址不存在");
         }
         if (!Objects.equals(current.getUserId(), request.getUserId())) {
-            throw new IllegalArgumentException("receive address not found");
+            throw new IllegalArgumentException("收款地址不存在");
         }
 
         String network = normalizeReceiveAddressNetwork(request.getNetwork());
@@ -190,7 +190,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
                         .ne("id", request.getId())
         );
         if (exists != null && exists > 0) {
-            throw new IllegalArgumentException("receive address already exists");
+            throw new IllegalArgumentException("收款地址已存在");
         }
 
         current.setNetwork(network);
@@ -207,10 +207,10 @@ public class UserWalletServiceImpl implements IUserWalletService {
         validateReceiveAddressDeleteRequest(request);
         UserReceiveAddress current = userReceiveAddressMapper.selectById(request.getId());
         if (current == null || current.getStatus() == null || current.getStatus() != 1) {
-            throw new IllegalArgumentException("receive address not found");
+            throw new IllegalArgumentException("收款地址不存在");
         }
         if (!Objects.equals(current.getUserId(), request.getUserId())) {
-            throw new IllegalArgumentException("receive address not found");
+            throw new IllegalArgumentException("收款地址不存在");
         }
         current.setStatus(0);
         current.setUpdateTime(new Date());
@@ -225,7 +225,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Override
     public List<Map<String, Object>> listReceiveAddress(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         List<UserReceiveAddress> list = userReceiveAddressMapper.selectList(
                 new QueryWrapper<UserReceiveAddress>()
@@ -243,7 +243,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Override
     public List<Map<String, Object>> listRechargeByUser(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         List<RechargeOrder> list = rechargeOrderMapper.selectList(new QueryWrapper<RechargeOrder>().eq("user_id", userId).orderByDesc("id"));
         List<Map<String, Object>> result = new ArrayList<>();
@@ -256,7 +256,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Override
     public List<Map<String, Object>> listWithdrawByUser(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         List<WithdrawOrder> list = withdrawOrderMapper.selectList(new QueryWrapper<WithdrawOrder>().eq("user_id", userId).orderByDesc("id"));
         List<Map<String, Object>> result = new ArrayList<>();
@@ -325,10 +325,10 @@ public class UserWalletServiceImpl implements IUserWalletService {
     public Map<String, Object> auditRecharge(Long id, AuditRequest request) {
         RechargeOrder order = rechargeOrderMapper.selectById(id);
         if (order == null) {
-            throw new IllegalArgumentException("recharge order not found");
+            throw new IllegalArgumentException("充值订单不存在");
         }
         if (order.getStatus() != null && order.getStatus() != 0) {
-            throw new IllegalArgumentException("recharge order already audited");
+            throw new IllegalArgumentException("充值订单已审核");
         }
         validateAuditRequest(request);
         order.setStatus(request.getStatus());
@@ -351,10 +351,10 @@ public class UserWalletServiceImpl implements IUserWalletService {
     public Map<String, Object> auditWithdraw(Long id, AuditRequest request) {
         WithdrawOrder order = withdrawOrderMapper.selectById(id);
         if (order == null) {
-            throw new IllegalArgumentException("withdraw order not found");
+            throw new IllegalArgumentException("提现订单不存在");
         }
         if (order.getStatus() != null && order.getStatus() != 0) {
-            throw new IllegalArgumentException("withdraw order already audited");
+            throw new IllegalArgumentException("提现订单已审核");
         }
         validateAuditRequest(request);
         order.setStatus(request.getStatus());
@@ -430,12 +430,12 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Transactional
     public void decreaseBalance(Long userId, String asset, BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("amount must be greater than 0");
+            throw new IllegalArgumentException("金额必须大于0");
         }
         UserWallet wallet = getOrCreateWallet(userId);
         String normalizedAsset = normalizeAsset(asset);
         if (getBalanceByAsset(wallet, normalizedAsset).compareTo(amount) < 0) {
-            throw new IllegalArgumentException("insufficient balance");
+            throw new IllegalArgumentException("余额不足");
         }
         setBalanceByAsset(wallet, normalizedAsset, getBalanceByAsset(wallet, normalizedAsset).subtract(amount));
         userWalletMapper.updateById(wallet);
@@ -445,7 +445,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Transactional
     public void increaseBalance(Long userId, String asset, BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("amount must be greater than 0");
+            throw new IllegalArgumentException("金额必须大于0");
         }
         UserWallet wallet = getOrCreateWallet(userId);
         String normalizedAsset = normalizeAsset(asset);
@@ -456,7 +456,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Override
     public Map<String, Object> getInviteSummary(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         List<SysUser> level1Users = sysUserMapper.selectList(new QueryWrapper<SysUser>().eq("inviter_id", userId));
         int level1Count = level1Users.size();
@@ -505,7 +505,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Override
     public Map<String, Object> getInviteHierarchy(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         List<SysUser> level1Users = sysUserMapper.selectList(
                 new QueryWrapper<SysUser>().eq("inviter_id", userId).orderByDesc("id")
@@ -535,7 +535,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
     @Override
     public List<Map<String, Object>> listInviteRebateRecords(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         List<InviteRebateOrder> list = inviteRebateOrderMapper.selectList(
                 new QueryWrapper<InviteRebateOrder>()
@@ -579,28 +579,28 @@ public class UserWalletServiceImpl implements IUserWalletService {
     }
 
     private void validateRechargeRequest(RechargeSubmitRequest request) {
-        if (request == null) throw new IllegalArgumentException("request body is required");
-        if (request.getUserId() == null) throw new IllegalArgumentException("userId is required");
+        if (request == null) throw new IllegalArgumentException("请求体不能为空");
+        if (request.getUserId() == null) throw new IllegalArgumentException("用户编号不能为空");
         validateAssetNetwork(request.getAsset(), request.getNetwork());
         BigDecimal amount = resolveAmount(request.getAmount(), request.getAmountCny());
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("amount must be greater than 0");
+            throw new IllegalArgumentException("金额必须大于0");
         }
         if (!StringUtils.hasText(request.getVoucherImage())) {
-            throw new IllegalArgumentException("voucherImage is required");
+            throw new IllegalArgumentException("凭证图片不能为空");
         }
     }
 
     private void validateWithdrawRequest(WithdrawSubmitRequest request) {
-        if (request == null) throw new IllegalArgumentException("request body is required");
-        if (request.getUserId() == null) throw new IllegalArgumentException("userId is required");
+        if (request == null) throw new IllegalArgumentException("请求体不能为空");
+        if (request.getUserId() == null) throw new IllegalArgumentException("用户编号不能为空");
         validateAssetNetwork(request.getAsset(), request.getNetwork());
         BigDecimal amount = resolveAmount(request.getAmount(), request.getAmountCny());
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("amount must be greater than 0");
+            throw new IllegalArgumentException("金额必须大于0");
         }
         if (!StringUtils.hasText(request.getReceiveAddress())) {
-            throw new IllegalArgumentException("receiveAddress is required");
+            throw new IllegalArgumentException("收款地址不能为空");
         }
         String withdrawNetwork = request.getNetwork().trim().toUpperCase();
         Long boundCount = userReceiveAddressMapper.selectCount(
@@ -611,33 +611,33 @@ public class UserWalletServiceImpl implements IUserWalletService {
                         .eq("status", 1)
         );
         if (boundCount == null || boundCount <= 0) {
-            throw new IllegalArgumentException("please bind receive address before withdraw");
+            throw new IllegalArgumentException("提现前请先绑定收款地址");
         }
         if (!StringUtils.hasText(request.getWithdrawPassword())) {
-            throw new IllegalArgumentException("fundPassword is required");
+            throw new IllegalArgumentException("资金密码不能为空");
         }
 
         SysUser user = sysUserMapper.selectById(request.getUserId());
         if (user == null) {
-            throw new IllegalArgumentException("user not found");
+            throw new IllegalArgumentException("用户不存在");
         }
         if (!StringUtils.hasText(user.getWithdrawPassword())) {
-            throw new IllegalArgumentException("fund password not set, please set it in settings first");
+            throw new IllegalArgumentException("未设置资金密码，请先在设置中设置");
         }
         if (!passwordEncoder.matches(request.getWithdrawPassword().trim(), user.getWithdrawPassword())) {
-            throw new IllegalArgumentException("fund password is incorrect");
+            throw new IllegalArgumentException("资金密码错误");
         }
     }
 
     private void validateReceiveAddressAddRequest(ReceiveAddressAddRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (request.getUserId() == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         if (!StringUtils.hasText(request.getReceiveAddress())) {
-            throw new IllegalArgumentException("receiveAddress is required");
+            throw new IllegalArgumentException("收款地址不能为空");
         }
         normalizeReceiveAddressNetwork(request.getNetwork());
         verifyFundPassword(request.getUserId(), request.getFundPassword());
@@ -645,16 +645,16 @@ public class UserWalletServiceImpl implements IUserWalletService {
 
     private void validateReceiveAddressUpdateRequest(ReceiveAddressUpdateRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (request.getUserId() == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         if (request.getId() == null) {
-            throw new IllegalArgumentException("id is required");
+            throw new IllegalArgumentException("编号不能为空");
         }
         if (!StringUtils.hasText(request.getReceiveAddress())) {
-            throw new IllegalArgumentException("receiveAddress is required");
+            throw new IllegalArgumentException("收款地址不能为空");
         }
         normalizeReceiveAddressNetwork(request.getNetwork());
         verifyFundPassword(request.getUserId(), request.getFundPassword());
@@ -662,36 +662,36 @@ public class UserWalletServiceImpl implements IUserWalletService {
 
     private void validateReceiveAddressDeleteRequest(ReceiveAddressDeleteRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (request.getUserId() == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         if (request.getId() == null) {
-            throw new IllegalArgumentException("id is required");
+            throw new IllegalArgumentException("编号不能为空");
         }
         verifyFundPassword(request.getUserId(), request.getFundPassword());
     }
 
     private void verifyFundPassword(Long userId, String fundPassword) {
         if (!StringUtils.hasText(fundPassword)) {
-            throw new IllegalArgumentException("fundPassword is required");
+            throw new IllegalArgumentException("资金密码不能为空");
         }
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null) {
-            throw new IllegalArgumentException("user not found");
+            throw new IllegalArgumentException("用户不存在");
         }
         if (!StringUtils.hasText(user.getWithdrawPassword())) {
-            throw new IllegalArgumentException("fund password not set, please set it in settings first");
+            throw new IllegalArgumentException("未设置资金密码，请先在设置中设置");
         }
         if (!passwordEncoder.matches(fundPassword.trim(), user.getWithdrawPassword())) {
-            throw new IllegalArgumentException("fund password is incorrect");
+            throw new IllegalArgumentException("资金密码错误");
         }
     }
 
     private void validateAssetNetwork(String asset, String network) {
         if (!StringUtils.hasText(asset) || !StringUtils.hasText(network)) {
-            throw new IllegalArgumentException("asset and network are required");
+            throw new IllegalArgumentException("币种和网络不能为空");
         }
         String a = asset.trim().toUpperCase();
         String n = network.trim().toUpperCase();
@@ -699,27 +699,27 @@ public class UserWalletServiceImpl implements IUserWalletService {
                 || ("USDC".equals(a) && "ERC20".equals(n))
                 || ("BTC".equals(a) && "BTC".equals(n));
         if (!valid) {
-            throw new IllegalArgumentException("invalid asset/network pair");
+            throw new IllegalArgumentException("币种与网络不匹配");
         }
     }
 
     private String normalizeReceiveAddressNetwork(String network) {
         if (!StringUtils.hasText(network)) {
-            throw new IllegalArgumentException("network is required");
+            throw new IllegalArgumentException("网络不能为空");
         }
         String normalized = network.trim().toUpperCase();
         if (!"TRC20".equals(normalized) && !"ERC20".equals(normalized) && !"BTC".equals(normalized)) {
-            throw new IllegalArgumentException("network must be one of TRC20/ERC20/BTC");
+            throw new IllegalArgumentException("网络必须是 TRC20/ERC20/BTC 之一");
         }
         return normalized;
     }
 
     private void validateAuditRequest(AuditRequest request) {
         if (request == null || request.getStatus() == null) {
-            throw new IllegalArgumentException("status is required");
+            throw new IllegalArgumentException("状态不能为空");
         }
         if (request.getStatus() != 1 && request.getStatus() != 2) {
-            throw new IllegalArgumentException("status must be 1(approve) or 2(reject)");
+            throw new IllegalArgumentException("状态必须是 1(通过) 或 2(拒绝)");
         }
     }
 
@@ -999,11 +999,11 @@ public class UserWalletServiceImpl implements IUserWalletService {
 
     private String normalizeAsset(String asset) {
         if (!StringUtils.hasText(asset)) {
-            throw new IllegalArgumentException("asset is required");
+            throw new IllegalArgumentException("币种不能为空");
         }
         String normalized = asset.trim().toUpperCase();
         if (!"USDT".equals(normalized) && !"USDC".equals(normalized) && !"BTC".equals(normalized)) {
-            throw new IllegalArgumentException("asset must be one of USDT/USDC/BTC");
+            throw new IllegalArgumentException("币种必须是 USDT/USDC/BTC 之一");
         }
         return normalized;
     }

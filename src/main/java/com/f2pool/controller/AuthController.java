@@ -58,12 +58,12 @@ public class AuthController {
         Claims claims = jwtTokenUtil.parseClaims(token);
         Object uid = claims.get("uid");
         if (uid == null) {
-            throw ApiException.unauthorized("invalid token: uid missing");
+            throw ApiException.unauthorized("无效令牌：缺少用户标识");
         }
         Long userId = Long.valueOf(String.valueOf(uid));
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null) {
-            throw ApiException.notFound("user not found");
+            throw ApiException.notFound("用户不存在");
         }
 
         Map<String, Object> data = new HashMap<>();

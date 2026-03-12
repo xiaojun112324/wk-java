@@ -47,7 +47,7 @@ public class JwtTokenUtil {
 
     public Claims parseClaims(String token) {
         if (!StringUtils.hasText(token)) {
-            throw ApiException.unauthorized("token is required");
+            throw ApiException.unauthorized("令牌不能为空");
         }
         try {
             return Jwts.parser()
@@ -56,20 +56,20 @@ public class JwtTokenUtil {
                     .parseSignedClaims(token.trim())
                     .getPayload();
         } catch (JwtException e) {
-            throw ApiException.unauthorized("invalid token");
+            throw ApiException.unauthorized("无效令牌");
         }
     }
 
     public String extractToken(String authorizationHeader) {
         if (!StringUtils.hasText(authorizationHeader)) {
-            throw ApiException.unauthorized("Authorization header is required");
+            throw ApiException.unauthorized("请求头缺少授权信息");
         }
         String value = authorizationHeader.trim();
         if (value.regionMatches(true, 0, "Bearer ", 0, 7)) {
             value = value.substring(7).trim();
         }
         if (!StringUtils.hasText(value)) {
-            throw ApiException.unauthorized("token is required");
+            throw ApiException.unauthorized("令牌不能为空");
         }
         return value;
     }

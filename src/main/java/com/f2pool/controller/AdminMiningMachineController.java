@@ -51,7 +51,7 @@ public class AdminMiningMachineController {
     public R<MiningMachine> detail(@PathVariable Long id) {
         MiningMachine machine = miningMachineService.getById(id);
         if (machine == null) {
-            throw ApiException.notFound("machine not found");
+            throw ApiException.notFound("矿机不存在");
         }
         return R.ok(machine);
     }

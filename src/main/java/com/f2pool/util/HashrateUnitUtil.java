@@ -32,10 +32,10 @@ public final class HashrateUnitUtil {
 
     public static BigDecimal toTH(BigDecimal value, String unit) {
         if (value == null) {
-            throw new IllegalArgumentException("hashrate value is required");
+            throw new IllegalArgumentException("算力值不能为空");
         }
         if (!isSupportedUnit(unit)) {
-            throw new IllegalArgumentException("unsupported hashrate unit: " + unit);
+            throw new IllegalArgumentException("不支持的算力单位：" + unit);
         }
         return value.multiply(UNIT_TO_TH_FACTOR.get(unit.toUpperCase()));
     }

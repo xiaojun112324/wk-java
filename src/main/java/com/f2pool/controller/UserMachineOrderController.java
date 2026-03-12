@@ -64,7 +64,7 @@ public class UserMachineOrderController {
         Map<String, Object> order = userMachineOrderService.detail(id);
         Object owner = order.get("userId");
         if (owner == null || !String.valueOf(userId).equals(String.valueOf(owner))) {
-            throw ApiException.forbidden("order does not belong to this user");
+            throw ApiException.forbidden("该订单不属于当前用户");
         }
         return R.ok(order);
     }

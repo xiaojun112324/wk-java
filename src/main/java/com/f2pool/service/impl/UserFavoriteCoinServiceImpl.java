@@ -101,7 +101,7 @@ public class UserFavoriteCoinServiceImpl implements IUserFavoriteCoinService {
 
     private String normalizeSymbol(String symbol) {
         if (!StringUtils.hasText(symbol)) {
-            throw ApiException.badRequest("symbol is required");
+            throw ApiException.badRequest("币种标识不能为空");
         }
         return symbol.trim().toUpperCase(Locale.ROOT);
     }
@@ -109,7 +109,7 @@ public class UserFavoriteCoinServiceImpl implements IUserFavoriteCoinService {
     private void assertCoinExists(String symbol) {
         MiningCoin coin = miningCoinService.getCoinDetail(null, symbol);
         if (coin == null) {
-            throw ApiException.notFound("coin not found: " + symbol);
+            throw ApiException.notFound("币种不存在: " + symbol);
         }
     }
 }

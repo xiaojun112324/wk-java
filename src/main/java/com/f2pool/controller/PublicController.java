@@ -68,7 +68,7 @@ public class PublicController {
             @ApiParam(value = "coin symbol", example = "BTC") @RequestParam(required = false) String symbol) {
         MiningCoin coin = miningCoinService.getCoinDetail(id, symbol);
         if (coin == null) {
-            throw ApiException.notFound("coin not found");
+            throw ApiException.notFound("币种不存在");
         }
         return R.ok(coin);
     }
@@ -106,7 +106,7 @@ public class PublicController {
 
         MiningCoin coin = miningCoinService.getCoinDetail(null, symbol);
         if (coin == null) {
-            throw ApiException.notFound("coin not found: " + symbol);
+            throw ApiException.notFound("币种不存在: " + symbol);
         }
 
         BigDecimal totalHashrateTh = hashrate.multiply(unitFactor);

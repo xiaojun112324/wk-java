@@ -58,7 +58,7 @@ public class AdminAuthController {
 
         AdminUser user = adminUserMapper.selectById(userId);
         if (user == null) {
-            throw ApiException.notFound("admin user not found");
+            throw ApiException.notFound("管理员不存在");
         }
         Map<String, Object> data = new HashMap<>();
         data.put("id", user.getId());

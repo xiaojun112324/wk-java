@@ -19,11 +19,11 @@ public class TokenContextUtil {
         Claims claims = parseClaims(authorization);
         String role = String.valueOf(claims.get("role"));
         if (!"USER".equalsIgnoreCase(role)) {
-            throw ApiException.forbidden("forbidden: user token required");
+            throw ApiException.forbidden("禁止访问：需要用户令牌");
         }
         Object uid = claims.get("uid");
         if (uid == null) {
-            throw ApiException.unauthorized("invalid token: uid missing");
+            throw ApiException.unauthorized("无效令牌：缺少用户标识");
         }
         return Long.valueOf(String.valueOf(uid));
     }
@@ -33,11 +33,11 @@ public class TokenContextUtil {
         Claims claims = parseClaims(authorization);
         String role = String.valueOf(claims.get("role"));
         if (!"ADMIN".equalsIgnoreCase(role)) {
-            throw ApiException.forbidden("forbidden: admin token required");
+            throw ApiException.forbidden("禁止访问：需要管理员令牌");
         }
         Object uid = claims.get("uid");
         if (uid == null) {
-            throw ApiException.unauthorized("invalid token: uid missing");
+            throw ApiException.unauthorized("无效令牌：缺少用户标识");
         }
         Long adminId = Long.valueOf(String.valueOf(uid));
         validateAdminSession(adminId, token);
@@ -51,7 +51,7 @@ public class TokenContextUtil {
 
     private void validateAdminSession(Long adminId, String token) {
         if (adminId == null || !StringUtils.hasText(token)) {
-            throw ApiException.unauthorized("invalid token");
+            throw ApiException.unauthorized("无效令牌");
         }
         String key = ADMIN_SESSION_TOKEN_KEY_PREFIX + adminId;
         String latestToken = stringRedisTemplate.opsForValue().get(key);

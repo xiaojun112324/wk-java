@@ -39,12 +39,12 @@ public class MiningMachineServiceImpl extends ServiceImpl<MiningMachineMapper, M
     @Override
     public MiningMachine update(Long id, MiningMachineSaveRequest request) {
         if (id == null) {
-            throw new IllegalArgumentException("id is required");
+            throw new IllegalArgumentException("编号不能为空");
         }
         validateRequest(request);
         MiningMachine machine = getById(id);
         if (machine == null) {
-            throw new IllegalArgumentException("machine not found");
+            throw new IllegalArgumentException("矿机不存在");
         }
         fillMachine(machine, request);
         updateById(machine);
@@ -63,28 +63,28 @@ public class MiningMachineServiceImpl extends ServiceImpl<MiningMachineMapper, M
 
     private void validateRequest(MiningMachineSaveRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (!StringUtils.hasText(request.getName())) {
-            throw new IllegalArgumentException("name is required");
+            throw new IllegalArgumentException("名称不能为空");
         }
         if (!StringUtils.hasText(request.getCoinSymbol())) {
-            throw new IllegalArgumentException("coinSymbol is required");
+            throw new IllegalArgumentException("币种标识不能为空");
         }
         if (request.getHashrateValue() == null || request.getHashrateValue().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("hashrateValue must be greater than 0");
+            throw new IllegalArgumentException("算力值必须大于0");
         }
         if (!StringUtils.hasText(request.getHashrateUnit())) {
-            throw new IllegalArgumentException("hashrateUnit is required");
+            throw new IllegalArgumentException("算力单位不能为空");
         }
         if (!HashrateUnitUtil.isSupportedUnit(request.getHashrateUnit())) {
-            throw new IllegalArgumentException("unsupported hashrate unit: " + request.getHashrateUnit());
+            throw new IllegalArgumentException("不支持的算力单位：" + request.getHashrateUnit());
         }
         if (request.getPricePerUnit() == null || request.getPricePerUnit().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("pricePerUnit must be greater than 0");
+            throw new IllegalArgumentException("单价必须大于0");
         }
         if (request.getLockDays() != null && request.getLockDays() < 0) {
-            throw new IllegalArgumentException("lockDays must be greater than or equal to 0");
+            throw new IllegalArgumentException("锁定天数必须大于等于0");
         }
     }
 

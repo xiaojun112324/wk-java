@@ -49,7 +49,7 @@ public class AdminBannerController {
     public R<Banner> detail(@PathVariable Long id) {
         Banner banner = bannerService.getById(id);
         if (banner == null) {
-            throw ApiException.notFound("banner not found");
+            throw ApiException.notFound("轮播图不存在");
         }
         return R.ok(withImageUrl(banner));
     }

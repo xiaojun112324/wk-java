@@ -34,11 +34,11 @@ public class SysConfigServiceImpl implements ISysConfigService {
     @Override
     public Map<String, Object> getByKey(String key) {
         if (!StringUtils.hasText(key)) {
-            throw new IllegalArgumentException("config key is required");
+            throw new IllegalArgumentException("配置键不能为空");
         }
         SysConfig config = sysConfigMapper.selectOne(new QueryWrapper<SysConfig>().eq("config_key", key.trim()));
         if (config == null) {
-            throw new IllegalArgumentException("config not found");
+            throw new IllegalArgumentException("配置不存在");
         }
         return build(config);
     }
@@ -47,19 +47,19 @@ public class SysConfigServiceImpl implements ISysConfigService {
     @Transactional
     public Map<String, Object> updateByKey(String key, SysConfigUpdateRequest request) {
         if (!StringUtils.hasText(key)) {
-            throw new IllegalArgumentException("config key is required");
+            throw new IllegalArgumentException("配置键不能为空");
         }
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         String k = key.trim();
         if (k.startsWith("recharge_")) {
-            throw new IllegalArgumentException("recharge address config can only be modified in database");
+            throw new IllegalArgumentException("充值地址配置仅可在数据库中修改");
         }
 
         SysConfig config = sysConfigMapper.selectOne(new QueryWrapper<SysConfig>().eq("config_key", k));
         if (config == null) {
-            throw new IllegalArgumentException("config not found");
+            throw new IllegalArgumentException("配置不存在");
         }
 
         if (request.getConfigValue() != null) {
@@ -67,7 +67,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
         }
         if (request.getStatus() != null) {
             if (request.getStatus() != 0 && request.getStatus() != 1) {
-                throw new IllegalArgumentException("status must be 0 or 1");
+                throw new IllegalArgumentException("状态必须是0或1");
             }
             config.setStatus(request.getStatus());
         }

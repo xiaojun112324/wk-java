@@ -55,7 +55,7 @@ public class AdminUserRestrictionController {
                                             @RequestParam Long userId) {
         tokenContextUtil.requireAdminId(authorization);
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         UserFeatureRestriction row = userFeatureRestrictionMapper.selectOne(
                 new QueryWrapper<UserFeatureRestriction>()
@@ -73,7 +73,7 @@ public class AdminUserRestrictionController {
                                             @RequestBody AdminUserRestrictionUpsertRequest request) {
         tokenContextUtil.requireAdminId(authorization);
         if (request == null || request.getUserId() == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         UserFeatureRestriction row = userFeatureRestrictionMapper.selectOne(
                 new QueryWrapper<UserFeatureRestriction>()
@@ -106,11 +106,11 @@ public class AdminUserRestrictionController {
     public R<Map<String, Object>> delete(@RequestHeader("Authorization") String authorization, @PathVariable Long id) {
         tokenContextUtil.requireAdminId(authorization);
         if (id == null) {
-            throw new IllegalArgumentException("id is required");
+            throw new IllegalArgumentException("编号不能为空");
         }
         UserFeatureRestriction row = userFeatureRestrictionMapper.selectById(id);
         if (row == null) {
-            throw new IllegalArgumentException("id is required");
+            throw new IllegalArgumentException("编号不能为空");
         }
         row.setStatus(0);
         userFeatureRestrictionMapper.updateById(row);

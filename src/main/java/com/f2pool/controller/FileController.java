@@ -35,7 +35,7 @@ public class FileController {
     @PostMapping("/upload")
     public R<Map<String, Object>> upload(@RequestParam("file") MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("file is required");
+            throw new IllegalArgumentException("文件不能为空");
         }
 
         Path uploadPath = Paths.get(UPLOAD_DIR);

@@ -257,7 +257,7 @@ public class CoinSyncTask {
                 .body();
         Matcher matcher = Pattern.compile("coins_data\\.js\\?t=(\\d+)").matcher(home == null ? "" : home);
         if (!matcher.find()) {
-            throw new RuntimeException("cannot parse miningpoolstats timestamp");
+            throw new RuntimeException("无法解析矿池数据时间戳");
         }
 
         String dataUrl = String.format(MINING_POOL_STATS_DATA, matcher.group(1));
@@ -270,7 +270,7 @@ public class CoinSyncTask {
         JSONObject root = JSON.parseObject(dataText);
         JSONArray data = root.getJSONArray("data");
         if (data == null || data.isEmpty()) {
-            throw new RuntimeException("miningpoolstats empty data");
+            throw new RuntimeException("矿池数据返回为空");
         }
 
         Map<String, JSONObject> bySymbol = new HashMap<>();

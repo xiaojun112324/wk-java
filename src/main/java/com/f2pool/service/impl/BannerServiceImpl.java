@@ -23,12 +23,12 @@ public class BannerServiceImpl extends ServiceImpl<BannerMapper, Banner> impleme
     @Override
     public Banner update(Long id, BannerSaveRequest request) {
         if (id == null) {
-            throw new IllegalArgumentException("id is required");
+            throw new IllegalArgumentException("编号不能为空");
         }
         validateRequest(request);
         Banner banner = getById(id);
         if (banner == null) {
-            throw new IllegalArgumentException("banner not found");
+            throw new IllegalArgumentException("轮播图不存在");
         }
         banner.setImage(normalizeImagePath(request.getImage()));
         updateById(banner);
@@ -37,10 +37,10 @@ public class BannerServiceImpl extends ServiceImpl<BannerMapper, Banner> impleme
 
     private void validateRequest(BannerSaveRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (!StringUtils.hasText(request.getImage())) {
-            throw new IllegalArgumentException("image is required");
+            throw new IllegalArgumentException("图片不能为空");
         }
     }
 

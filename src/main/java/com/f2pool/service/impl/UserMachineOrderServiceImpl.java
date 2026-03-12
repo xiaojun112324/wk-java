@@ -82,10 +82,10 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
 
         MiningMachine machine = miningMachineService.getById(request.getMachineId());
         if (machine == null) {
-            throw new IllegalArgumentException("machine not found");
+            throw new IllegalArgumentException("矿机不存在");
         }
         if (machine.getStatus() == null || machine.getStatus() != 1) {
-            throw new IllegalArgumentException("machine is not on sale");
+            throw new IllegalArgumentException("矿机未上架");
         }
 
         int quantity = request.getQuantity();
@@ -129,11 +129,11 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
 
         String symbol = request.getCoinSymbol().trim().toUpperCase();
         if (!"BTC".equals(symbol)) {
-            throw new IllegalArgumentException("鏆傛湭寮€閫氭鐭挎睜");
+            throw new IllegalArgumentException("仅支持BTC下单算力");
         }
         BigDecimal pricePerPUsd = getConfigDecimal(PRICE_PER_P_USD_KEY);
         if (pricePerPUsd.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("sys_config machine_price_per_p_usd must be greater than 0");
+            throw new IllegalArgumentException("系统配置 machine_price_per_p_usd 必须大于0");
         }
         BigDecimal pCount = resolvePCount(request, pricePerPUsd);
         BigDecimal totalInvest = pricePerPUsd.multiply(pCount).setScale(8, RoundingMode.HALF_UP);
@@ -144,7 +144,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
             usdtPay = totalInvest;
         }
         if (usdtPay.add(usdcPay).setScale(8, RoundingMode.HALF_UP).compareTo(totalInvest) != 0) {
-            throw new IllegalArgumentException("usdtPay + usdcPay must equal total amount");
+            throw new IllegalArgumentException("USDT支付与USDC支付之和必须等于总金额");
         }
         if (usdtPay.compareTo(BigDecimal.ZERO) > 0) {
             userWalletService.decreaseBalance(request.getUserId(), "USDT", usdtPay);
@@ -155,7 +155,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
 
         MiningCoin coin = miningCoinService.getCoinDetail(null, symbol);
         if (coin == null) {
-            throw new IllegalArgumentException("coin not found");
+            throw new IllegalArgumentException("币种不存在");
         }
 
         BigDecimal totalHashrateTh = pCount.multiply(TH_PER_PH).setScale(8, RoundingMode.HALF_UP);
@@ -163,7 +163,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         order.setUserId(request.getUserId());
         order.setMachineId(0L);
         order.setCoinSymbol(symbol);
-        order.setMachineName(symbol + " P鍚堝悓");
+        order.setMachineName(symbol + " P合同");
         order.setHashrateValue(pCount);
         order.setHashrateUnit("PH");
         order.setQuantity(1);
@@ -198,7 +198,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     @Override
     public List<Map<String, Object>> listByUserId(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         List<UserMachineOrder> orders = list(new QueryWrapper<UserMachineOrder>().eq("user_id", userId).orderByDesc("id"));
         List<Map<String, Object>> result = new ArrayList<>();
@@ -211,11 +211,11 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     @Override
     public Map<String, Object> detail(Long id) {
         if (id == null) {
-            throw new IllegalArgumentException("id is required");
+            throw new IllegalArgumentException("编号不能为空");
         }
         UserMachineOrder order = getById(id);
         if (order == null) {
-            throw new IllegalArgumentException("order not found");
+            throw new IllegalArgumentException("订单不存在");
         }
         return buildOrderView(order);
     }
@@ -250,7 +250,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     public Map<String, Object> cancel(Long id, UserMachineOrderActionRequest request) {
         UserMachineOrder order = getOrderForOperate(id, request);
         if (safe(order.getTotalRevenueCoin()).compareTo(BigDecimal.ZERO) > 0) {
-            throw new IllegalArgumentException("order with revenue cannot be canceled");
+            throw new IllegalArgumentException("已有收益的订单不能取消");
         }
         BigDecimal settleAmount = safe(order.getTotalInvest()).setScale(8, RoundingMode.HALF_UP);
         order.setSellAmountCny(settleAmount);
@@ -265,7 +265,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     @Override
     public Map<String, Object> revenueWithdrawSummary(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         List<UserMachineOrder> orders = list(new QueryWrapper<UserMachineOrder>()
                 .eq("user_id", userId)
@@ -316,26 +316,26 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     @Transactional
     public Map<String, Object> withdrawRevenue(Long id, UserMachineRevenueWithdrawRequest request) {
         if (id == null) {
-            throw new IllegalArgumentException("id is required");
+            throw new IllegalArgumentException("编号不能为空");
         }
         if (request == null || request.getUserId() == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         UserMachineOrder order = getById(id);
         if (order == null) {
-            throw new IllegalArgumentException("order not found");
+            throw new IllegalArgumentException("订单不存在");
         }
         if (!request.getUserId().equals(order.getUserId())) {
-            throw new IllegalArgumentException("order does not belong to this user");
+            throw new IllegalArgumentException("该订单不属于当前用户");
         }
         userFeatureRestrictionService.assertRevenueWithdrawAllowed(order.getUserId());
         BigDecimal withdrawable = getWithdrawableRevenue(order);
         if (withdrawable.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("no withdrawable revenue");
+            throw new IllegalArgumentException("暂无可提现收益");
         }
         String receiveAddress = resolveReceiveAddress(request.getUserId(), request.getReceiveAddress(), order.getReceiveAddress(), "BTC");
         if (!StringUtils.hasText(receiveAddress)) {
-            throw new IllegalArgumentException("please bind receive address before withdraw");
+            throw new IllegalArgumentException("提现前请先绑定收款地址");
         }
         order.setReceiveAddress(receiveAddress);
         order.setExtractedRevenueCoin(safe(order.getExtractedRevenueCoin()).add(withdrawable).setScale(12, RoundingMode.HALF_UP));
@@ -359,7 +359,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     @Transactional
     public Map<String, Object> withdrawRevenueAll(UserMachineRevenueWithdrawRequest request) {
         if (request == null || request.getUserId() == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         userFeatureRestrictionService.assertRevenueWithdrawAllowed(request.getUserId());
         List<UserMachineOrder> allOrders = list(new QueryWrapper<UserMachineOrder>()
@@ -367,7 +367,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
                 .in("status", 1, 2, 3)
                 .orderByDesc("id"));
         if (allOrders.isEmpty()) {
-            throw new IllegalArgumentException("no machine order found");
+            throw new IllegalArgumentException("未找到算力订单");
         }
 
         Set<Long> targetIds = new LinkedHashSet<>();
@@ -393,13 +393,13 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
             total = total.add(withdrawable);
         }
         if (targetOrders.isEmpty() || total.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("no withdrawable revenue");
+            throw new IllegalArgumentException("暂无可提现收益");
         }
 
         String fallbackOrderAddress = targetOrders.get(0).getReceiveAddress();
         String receiveAddress = resolveReceiveAddress(request.getUserId(), request.getReceiveAddress(), fallbackOrderAddress, "BTC");
         if (!StringUtils.hasText(receiveAddress)) {
-            throw new IllegalArgumentException("please bind receive address before withdraw");
+            throw new IllegalArgumentException("提现前请先绑定收款地址");
         }
 
         WithdrawOrder withdrawOrder = createMachineRevenueWithdrawOrder(request.getUserId(), receiveAddress, total);
@@ -509,31 +509,31 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
 
     private void validateRequest(UserMachineOrderCreateRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (request.getUserId() == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         if (request.getMachineId() == null) {
-            throw new IllegalArgumentException("machineId is required");
+            throw new IllegalArgumentException("矿机编号不能为空");
         }
         if (request.getQuantity() == null || request.getQuantity() <= 0) {
-            throw new IllegalArgumentException("quantity must be greater than 0");
+            throw new IllegalArgumentException("数量必须大于0");
         }
     }
 
     private void validateBuyByPRequest(UserMachineOrderBuyByPRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (request.getUserId() == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         if (!StringUtils.hasText(request.getCoinSymbol())) {
-            throw new IllegalArgumentException("coinSymbol is required");
+            throw new IllegalArgumentException("币种标识不能为空");
         }
         if (!StringUtils.hasText(request.getReceiveAddress())) {
-            throw new IllegalArgumentException("please bind receive address before buying");
+            throw new IllegalArgumentException("购买前请先绑定收款地址");
         }
         Long boundCount = userReceiveAddressMapper.selectCount(
                 new QueryWrapper<UserReceiveAddress>()
@@ -543,7 +543,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
                         .eq("status", 1)
         );
         if (boundCount == null || boundCount <= 0) {
-            throw new IllegalArgumentException("please bind receive address before buying");
+            throw new IllegalArgumentException("购买前请先绑定收款地址");
         }
     }
 
@@ -564,7 +564,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
             return BigDecimal.ZERO;
         }
         if (amount.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("pay amount must be >= 0");
+            throw new IllegalArgumentException("支付金额必须大于等于0");
         }
         return amount.setScale(8, RoundingMode.HALF_UP);
     }
@@ -580,25 +580,25 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
                 return derived;
             }
         }
-        throw new IllegalArgumentException("pCount must be greater than 0");
+        throw new IllegalArgumentException("P数量必须大于0");
     }
 
     private UserMachineOrder getOrderForOperate(Long id, UserMachineOrderActionRequest request) {
         if (id == null) {
-            throw new IllegalArgumentException("id is required");
+            throw new IllegalArgumentException("编号不能为空");
         }
         if (request == null || request.getUserId() == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         UserMachineOrder order = getById(id);
         if (order == null) {
-            throw new IllegalArgumentException("order not found");
+            throw new IllegalArgumentException("订单不存在");
         }
         if (!request.getUserId().equals(order.getUserId())) {
-            throw new IllegalArgumentException("order does not belong to this user");
+            throw new IllegalArgumentException("该订单不属于当前用户");
         }
         if (order.getStatus() == null || order.getStatus() != 1) {
-            throw new IllegalArgumentException("order is not in holding status");
+            throw new IllegalArgumentException("订单不在持有状态");
         }
         return order;
     }
@@ -655,4 +655,3 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         return map;
     }
 }
-

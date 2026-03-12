@@ -99,7 +99,7 @@ public class AdminOrderController {
                                             @RequestBody AdminAssistOrderCreateRequest request) {
         tokenContextUtil.requireAdminId(authorization);
         if (request == null || request.getUserId() == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
         UserMachineOrderBuyByPRequest buy = new UserMachineOrderBuyByPRequest();
         buy.setUserId(request.getUserId());
@@ -119,7 +119,7 @@ public class AdminOrderController {
         tokenContextUtil.requireAdminId(authorization);
         UserMachineOrder order = userMachineOrderMapper.selectById(id);
         if (order == null) {
-            throw new IllegalArgumentException("order not found");
+            throw new IllegalArgumentException("订单不存在");
         }
         UserMachineOrderActionRequest request = new UserMachineOrderActionRequest();
         request.setUserId(order.getUserId());
@@ -134,7 +134,7 @@ public class AdminOrderController {
         tokenContextUtil.requireAdminId(authorization);
         UserMachineOrder order = userMachineOrderMapper.selectById(id);
         if (order == null) {
-            throw new IllegalArgumentException("order not found");
+            throw new IllegalArgumentException("订单不存在");
         }
         UserMachineRevenueWithdrawRequest request = new UserMachineRevenueWithdrawRequest();
         request.setUserId(order.getUserId());

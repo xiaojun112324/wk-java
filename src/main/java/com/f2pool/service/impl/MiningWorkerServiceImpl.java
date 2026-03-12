@@ -67,7 +67,7 @@ public class MiningWorkerServiceImpl extends ServiceImpl<MiningWorkerMapper, Min
     @Override
     public Map<String, Object> getRevenueOverview(Long userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new IllegalArgumentException("用户编号不能为空");
         }
 
         long totalWorkers = userMachineOrderMapper.selectCount(

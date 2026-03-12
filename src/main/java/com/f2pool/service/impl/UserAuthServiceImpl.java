@@ -33,19 +33,19 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
     @Override
     public Map<String, Object> register(RegisterRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (!StringUtils.hasText(request.getUsername())) {
-            throw new IllegalArgumentException("username is required");
+            throw new IllegalArgumentException("用户名不能为空");
         }
         if (!StringUtils.hasText(request.getEmail())) {
-            throw new IllegalArgumentException("email is required");
+            throw new IllegalArgumentException("邮箱不能为空");
         }
         if (!StringUtils.hasText(request.getPassword())) {
-            throw new IllegalArgumentException("password is required");
+            throw new IllegalArgumentException("密码不能为空");
         }
         if (request.getPassword().length() < 6) {
-            throw new IllegalArgumentException("password must be at least 6 characters");
+            throw new IllegalArgumentException("密码长度不能少于6位");
         }
 
         String username = request.getUsername().trim();
@@ -65,7 +65,7 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
         if (StringUtils.hasText(request.getInviteCode())) {
             SysUser inviter = getOne(new QueryWrapper<SysUser>().eq("invite_code", request.getInviteCode()));
             if (inviter == null) {
-                throw new IllegalArgumentException("invite code not found");
+                throw new IllegalArgumentException("邀请码不存在");
             }
             inviterId = inviter.getId();
         }
@@ -90,13 +90,13 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
     @Override
     public Map<String, Object> login(LoginRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (!StringUtils.hasText(request.getAccount())) {
-            throw new IllegalArgumentException("account is required");
+            throw new IllegalArgumentException("账号不能为空");
         }
         if (!StringUtils.hasText(request.getPassword())) {
-            throw new IllegalArgumentException("password is required");
+            throw new IllegalArgumentException("密码不能为空");
         }
 
         String account = request.getAccount().trim();
@@ -107,14 +107,14 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
         );
 
         if (user == null) {
-            throw ApiException.notFound("user not found");
+            throw ApiException.notFound("用户不存在");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
-            throw ApiException.forbidden("account is disabled");
+            throw ApiException.forbidden("账号已禁用");
         }
         userFeatureRestrictionService.assertLoginAllowed(user.getId());
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw ApiException.unauthorized("password is incorrect");
+            throw ApiException.unauthorized("密码错误");
         }
 
         Map<String, Object> result = new HashMap<>();
@@ -129,19 +129,19 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
     public Map<String, Object> updateLoginPassword(Long userId, UpdateLoginPasswordRequest request) {
         SysUser user = requireActiveUser(userId);
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (!StringUtils.hasText(request.getOldPassword())) {
-            throw new IllegalArgumentException("oldPassword is required");
+            throw new IllegalArgumentException("旧密码不能为空");
         }
         if (!StringUtils.hasText(request.getNewPassword())) {
-            throw new IllegalArgumentException("newPassword is required");
+            throw new IllegalArgumentException("新密码不能为空");
         }
         if (request.getNewPassword().trim().length() < 6) {
-            throw new IllegalArgumentException("newPassword must be at least 6 characters");
+            throw new IllegalArgumentException("新密码长度不能少于6位");
         }
         if (!passwordEncoder.matches(request.getOldPassword().trim(), user.getPassword())) {
-            throw ApiException.badRequest("old password is incorrect");
+            throw ApiException.badRequest("旧密码错误");
         }
         user.setPassword(passwordEncoder.encode(request.getNewPassword().trim()));
         updateById(user);
@@ -155,22 +155,22 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
     public Map<String, Object> updateWithdrawPassword(Long userId, UpdateWithdrawPasswordRequest request) {
         SysUser user = requireActiveUser(userId);
         if (request == null) {
-            throw new IllegalArgumentException("request body is required");
+            throw new IllegalArgumentException("请求体不能为空");
         }
         if (!StringUtils.hasText(request.getNewPassword())) {
-            throw new IllegalArgumentException("newPassword is required");
+            throw new IllegalArgumentException("新密码不能为空");
         }
         if (request.getNewPassword().trim().length() < 6) {
-            throw new IllegalArgumentException("newPassword must be at least 6 characters");
+            throw new IllegalArgumentException("新密码长度不能少于6位");
         }
 
         boolean hasOld = StringUtils.hasText(user.getWithdrawPassword());
         if (hasOld) {
             if (!StringUtils.hasText(request.getOldPassword())) {
-                throw new IllegalArgumentException("oldPassword is required");
+                throw new IllegalArgumentException("旧密码不能为空");
             }
             if (!passwordEncoder.matches(request.getOldPassword().trim(), user.getWithdrawPassword())) {
-                throw ApiException.badRequest("old fund password is incorrect");
+                throw ApiException.badRequest("旧资金密码错误");
             }
         }
 
@@ -205,14 +205,14 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
 
     private SysUser requireActiveUser(Long userId) {
         if (userId == null) {
-            throw ApiException.unauthorized("invalid token: uid missing");
+            throw ApiException.unauthorized("无效令牌：缺少用户标识");
         }
         SysUser user = getById(userId);
         if (user == null) {
-            throw ApiException.notFound("user not found");
+            throw ApiException.notFound("用户不存在");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
-            throw ApiException.forbidden("account is disabled");
+            throw ApiException.forbidden("账号已禁用");
         }
         return user;
     }
