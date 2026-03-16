@@ -11,7 +11,7 @@ import java.util.Date;
 @Data
 @TableName("user_machine_order")
 public class UserMachineOrder {
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.INPUT)
     private Long id;
     private Long userId;
     private Long machineId;

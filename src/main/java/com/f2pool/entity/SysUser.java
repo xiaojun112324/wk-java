@@ -10,7 +10,7 @@ import java.util.Date;
 @Data
 @TableName("user")
 public class SysUser {
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.INPUT)
     private Long id;
     private String username;
     private String email;

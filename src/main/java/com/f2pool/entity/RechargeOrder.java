@@ -11,7 +11,7 @@ import java.util.Date;
 @Data
 @TableName("recharge_order")
 public class RechargeOrder {
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.INPUT)
     private Long id;
     private Long userId;
     private String asset;

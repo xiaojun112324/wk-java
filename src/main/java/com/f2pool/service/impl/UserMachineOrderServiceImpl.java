@@ -26,6 +26,7 @@ import com.f2pool.service.IUserMachineOrderService;
 import com.f2pool.service.IUserWalletService;
 import com.f2pool.service.UserFeatureRestrictionService;
 import com.f2pool.util.HashrateUnitUtil;
+import com.f2pool.util.VisibleIdGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,6 +74,8 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     private MachineRevenueWithdrawItemMapper machineRevenueWithdrawItemMapper;
     @Autowired
     private UserFeatureRestrictionService userFeatureRestrictionService;
+    @Autowired
+    private VisibleIdGenerator visibleIdGenerator;
 
     @Override
     @Transactional
@@ -96,6 +99,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
         userWalletService.decreaseBalance(request.getUserId(), "USDT", totalInvest);
 
         UserMachineOrder order = new UserMachineOrder();
+        order.setId(visibleIdGenerator.nextId("user_machine_order"));
         order.setUserId(request.getUserId());
         order.setMachineId(machine.getId());
         order.setCoinSymbol(machine.getCoinSymbol());
@@ -160,6 +164,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
 
         BigDecimal totalHashrateTh = pCount.multiply(TH_PER_PH).setScale(8, RoundingMode.HALF_UP);
         UserMachineOrder order = new UserMachineOrder();
+        order.setId(visibleIdGenerator.nextId("user_machine_order"));
         order.setUserId(request.getUserId());
         order.setMachineId(0L);
         order.setCoinSymbol(symbol);
@@ -426,6 +431,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
 
     private WithdrawOrder createMachineRevenueWithdrawOrder(Long userId, String receiveAddress, BigDecimal amount) {
         WithdrawOrder withdrawOrder = new WithdrawOrder();
+        withdrawOrder.setId(visibleIdGenerator.nextId("withdraw_order"));
         withdrawOrder.setUserId(userId);
         withdrawOrder.setAsset("BTC");
         withdrawOrder.setNetwork("BTC");

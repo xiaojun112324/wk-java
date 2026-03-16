@@ -11,7 +11,7 @@ import java.util.Date;
 @Data
 @TableName("withdraw_order")
 public class WithdrawOrder {
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.INPUT)
     private Long id;
     private Long userId;
     private String asset;

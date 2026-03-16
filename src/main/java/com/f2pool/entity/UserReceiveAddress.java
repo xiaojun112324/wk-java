@@ -10,7 +10,7 @@ import java.util.Date;
 @Data
 @TableName("user_receive_address")
 public class UserReceiveAddress {
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.INPUT)
     private Long id;
     private Long userId;
     private String network;

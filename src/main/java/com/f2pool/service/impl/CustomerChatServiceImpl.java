@@ -36,7 +36,6 @@ public class CustomerChatServiceImpl implements ICustomerChatService {
     private CustomerChatRoomMapper roomMapper;
     @Autowired
     private CustomerChatMessageMapper messageMapper;
-    @Autowired
     private SysUserMapper sysUserMapper;
     @Autowired
     private AdminUserMapper adminUserMapper;

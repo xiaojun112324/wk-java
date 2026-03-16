@@ -30,6 +30,7 @@ import com.f2pool.mapper.UserWalletMapper;
 import com.f2pool.mapper.WithdrawOrderMapper;
 import com.f2pool.service.IUserWalletService;
 import com.f2pool.service.UserFeatureRestrictionService;
+import com.f2pool.util.VisibleIdGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -79,6 +80,8 @@ public class UserWalletServiceImpl implements IUserWalletService {
     private StringRedisTemplate stringRedisTemplate;
     @Autowired
     private UserFeatureRestrictionService userFeatureRestrictionService;
+    @Autowired
+    private VisibleIdGenerator visibleIdGenerator;
 
     @Override
     public Map<String, Object> getWallet(Long userId) {
@@ -104,6 +107,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
         validateRechargeRequest(request);
         userFeatureRestrictionService.assertRechargeAllowed(request.getUserId());
         RechargeOrder order = new RechargeOrder();
+        order.setId(visibleIdGenerator.nextId("recharge_order"));
         order.setUserId(request.getUserId());
         order.setAsset(request.getAsset().trim().toUpperCase());
         order.setNetwork(request.getNetwork().trim().toUpperCase());
@@ -130,6 +134,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
         userWalletMapper.updateById(wallet);
 
         WithdrawOrder order = new WithdrawOrder();
+        order.setId(visibleIdGenerator.nextId("withdraw_order"));
         order.setUserId(request.getUserId());
         order.setAsset(asset);
         order.setNetwork(request.getNetwork().trim().toUpperCase());
@@ -158,6 +163,7 @@ public class UserWalletServiceImpl implements IUserWalletService {
             throw new IllegalArgumentException("收款地址已存在");
         }
         UserReceiveAddress entity = new UserReceiveAddress();
+        entity.setId(visibleIdGenerator.nextId("user_receive_address"));
         entity.setUserId(request.getUserId());
         entity.setNetwork(network);
         entity.setReceiveAddress(receiveAddress);

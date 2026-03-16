@@ -12,6 +12,7 @@ import com.f2pool.entity.SysUser;
 import com.f2pool.mapper.SysUserMapper;
 import com.f2pool.service.IUserAuthService;
 import com.f2pool.service.UserFeatureRestrictionService;
+import com.f2pool.util.VisibleIdGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,8 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
     private JwtTokenUtil jwtTokenUtil;
     @Autowired
     private UserFeatureRestrictionService userFeatureRestrictionService;
+    @Autowired
+    private VisibleIdGenerator visibleIdGenerator;
 
     @Override
     public Map<String, Object> register(RegisterRequest request) {
@@ -71,6 +74,7 @@ public class UserAuthServiceImpl extends ServiceImpl<SysUserMapper, SysUser> imp
         }
 
         SysUser user = new SysUser();
+        user.setId(visibleIdGenerator.nextId("user"));
         user.setUsername(username);
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
