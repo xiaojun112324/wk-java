@@ -15,15 +15,22 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class MiningCoinServiceImpl extends ServiceImpl<MiningCoinMapper, MiningCoin> implements IMiningCoinService {
 
     private static final String CACHE_MARKET_KEY = "f2pool:cache:coin:market";
     private static final String CACHE_TREND_KEY_PREFIX = "f2pool:cache:coin:trend:";
+    private static final Pattern HASHRATE_PATTERN = Pattern.compile("([0-9]+(?:\\.[0-9]+)?)\\s*([KMGTPE]?H)/S", Pattern.CASE_INSENSITIVE);
+    private static final Map<String, String> BLOCK_REWARD_MAP = buildBlockRewardMap();
+    private static final Map<String, String> BLOCK_TIME_MAP = buildBlockTimeMap();
+    private static final Map<String, String> FEE_RATE_MAP = buildFeeRateMap();
 
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
@@ -85,6 +92,7 @@ public class MiningCoinServiceImpl extends ServiceImpl<MiningCoinMapper, MiningC
         MiningCoin coin = getOne(qw);
         if (coin != null) {
             applyCachedMarket(coin);
+            enrichCoinDetail(coin);
         }
         return coin;
     }
@@ -206,5 +214,109 @@ public class MiningCoinServiceImpl extends ServiceImpl<MiningCoinMapper, MiningC
         map.put("share", new BigDecimal(share * 100).setScale(2, RoundingMode.HALF_UP) + "%");
         map.put("icon", icon);
         list.add(map);
+    }
+
+    private void enrichCoinDetail(MiningCoin coin) {
+        String symbol = coin.getSymbol() == null ? "" : coin.getSymbol().toUpperCase();
+        coin.setBlockReward(BLOCK_REWARD_MAP.getOrDefault(symbol, "-"));
+        coin.setBlockTime(BLOCK_TIME_MAP.getOrDefault(symbol, "-"));
+        coin.setFeeRate(FEE_RATE_MAP.getOrDefault(symbol, "PPS 3%"));
+        coin.setEstimatedDailyOutputCoin(calcEstimatedDailyOutputCoin(coin));
+    }
+
+    private String calcEstimatedDailyOutputCoin(MiningCoin coin) {
+        if (coin == null || coin.getDailyRevenuePerP() == null || coin.getDailyRevenuePerP().compareTo(BigDecimal.ZERO) <= 0) {
+            return "-";
+        }
+        BigDecimal networkPh = parseHashrateToPH(coin.getNetworkHashrate());
+        if (networkPh.compareTo(BigDecimal.ZERO) <= 0) {
+            return "-";
+        }
+        BigDecimal dailyOutputCoin = coin.getDailyRevenuePerP()
+                .multiply(networkPh)
+                .setScale(8, RoundingMode.HALF_UP)
+                .stripTrailingZeros();
+        return dailyOutputCoin.toPlainString() + " " + (coin.getSymbol() == null ? "" : coin.getSymbol());
+    }
+
+    private BigDecimal parseHashrateToPH(String hashrateText) {
+        if (hashrateText == null || hashrateText.isBlank()) {
+            return BigDecimal.ZERO;
+        }
+        Matcher matcher = HASHRATE_PATTERN.matcher(hashrateText.trim().toUpperCase());
+        if (!matcher.find()) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal value = new BigDecimal(matcher.group(1));
+        String unit = matcher.group(2);
+        switch (unit) {
+            case "EH":
+                return value.multiply(new BigDecimal("1000"));
+            case "PH":
+                return value;
+            case "TH":
+                return value.divide(new BigDecimal("1000"), 20, RoundingMode.HALF_UP);
+            case "GH":
+                return value.divide(new BigDecimal("1000000"), 20, RoundingMode.HALF_UP);
+            case "MH":
+                return value.divide(new BigDecimal("1000000000"), 20, RoundingMode.HALF_UP);
+            case "KH":
+                return value.divide(new BigDecimal("1000000000000"), 20, RoundingMode.HALF_UP);
+            case "H":
+                return value.divide(new BigDecimal("1000000000000000"), 20, RoundingMode.HALF_UP);
+            default:
+                return BigDecimal.ZERO;
+        }
+    }
+
+    private static Map<String, String> buildBlockRewardMap() {
+        Map<String, String> map = new HashMap<>();
+        map.put("BTC", "3.125 BTC");
+        map.put("LTC", "6.25 LTC");
+        map.put("DOGE", "10000 DOGE");
+        map.put("BCH", "3.125 BCH");
+        map.put("ETC", "2.56 ETC");
+        map.put("KAS", "61.04 KAS");
+        map.put("RVN", "2500 RVN");
+        map.put("ZEC", "1.5625 ZEC");
+        map.put("DASH", "2.3097 DASH");
+        map.put("XMR", "0.6 XMR");
+        map.put("DGB", "556 DGB");
+        map.put("CKB", "1344 CKB");
+        map.put("ERG", "18 ERG");
+        map.put("BTG", "3.125 BTG");
+        map.put("ETHW", "2 ETHW");
+        map.put("FLUX", "37.5 FLUX");
+        return Collections.unmodifiableMap(map);
+    }
+
+    private static Map<String, String> buildBlockTimeMap() {
+        Map<String, String> map = new HashMap<>();
+        map.put("BTC", "10 分钟");
+        map.put("LTC", "2.5 分钟");
+        map.put("DOGE", "1 分钟");
+        map.put("BCH", "10 分钟");
+        map.put("ETC", "13 秒");
+        map.put("KAS", "1 秒");
+        map.put("RVN", "1 分钟");
+        map.put("ZEC", "75 秒");
+        map.put("DASH", "2.5 分钟");
+        map.put("XMR", "2 分钟");
+        map.put("DGB", "15 秒");
+        map.put("CKB", "10 秒");
+        map.put("ERG", "2 分钟");
+        map.put("BTG", "10 分钟");
+        map.put("ETHW", "13 秒");
+        map.put("FLUX", "2 分钟");
+        return Collections.unmodifiableMap(map);
+    }
+
+    private static Map<String, String> buildFeeRateMap() {
+        Map<String, String> map = new HashMap<>();
+        map.put("BTC", "FPPS 4% / PPLNS 2%");
+        map.put("ETHW", "PPLNS 1%");
+        map.put("ETC", "PPS 1%");
+        map.put("DOGE", "PPLNS 4%");
+        return Collections.unmodifiableMap(map);
     }
 }

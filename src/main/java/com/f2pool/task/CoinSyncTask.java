@@ -152,6 +152,7 @@ public class CoinSyncTask {
             BigDecimal hashRateEH = hashRateGH.divide(new BigDecimal("1000000000"), 2, RoundingMode.HALF_UP);
             BigDecimal hashRatePH = hashRateEH.multiply(new BigDecimal("1000"));
             updateWrapper.set("network_hashrate", formatHashrate(hashRatePH, "PH"));
+            updateWrapper.set("pool_hashrate", calcPoolHashrate(hashRatePH, "PH"));
 
             // 基础公式得到的是每 TH 的收益，换算成每 PH 需 *1000
             double baseRevenue = (3.125 * 86400) / (difficulty.doubleValue() * 4294967296.0) * 1000000000000.0;
@@ -198,8 +199,7 @@ public class CoinSyncTask {
                 BigDecimal netHashPH = netHashEH.multiply(new BigDecimal("1000"));
                 updateWrapper.set("network_hashrate", formatHashrate(netHashPH, "PH"));
 
-                BigDecimal poolHashPH = netHashPH.multiply(new BigDecimal("0.142"));
-                updateWrapper.set("pool_hashrate", formatHashrate(poolHashPH, "PH"));
+                updateWrapper.set("pool_hashrate", calcPoolHashrate(netHashPH, "PH"));
             }
 
             if (difficultyChange != null) {
@@ -308,15 +308,13 @@ public class CoinSyncTask {
             if (hashrateH == null || hashrateH.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
-            BigDecimal poolsHashrateH = item.getBigDecimal("ph");
             BigDecimal e24 = item.getBigDecimal("e24");
             MiningCoin currentCoin = miningCoinService.query().eq("symbol", symbol).one();
 
             UpdateWrapper<MiningCoin> wrapper = new UpdateWrapper<>();
             wrapper.eq("symbol", symbol);
             wrapper.set("network_hashrate", formatHashrate(hashrateH, "H"));
-            wrapper.set("pool_hashrate", formatHashrate(
-                    poolsHashrateH != null && poolsHashrateH.compareTo(BigDecimal.ZERO) > 0 ? poolsHashrateH : hashrateH, "H"));
+            wrapper.set("pool_hashrate", calcPoolHashrate(hashrateH, "H"));
 
             BigDecimal resolvedDailyRevenuePerP = null;
             if (e24 != null && e24.compareTo(BigDecimal.ZERO) > 0) {
@@ -391,6 +389,12 @@ public class CoinSyncTask {
         }
         String formatted = hashH.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
         return formatted + " " + units[idx] + "/s";
+    }
+
+    private String calcPoolHashrate(BigDecimal networkHashrate, String unit) {
+        BigDecimal poolHashH = toH(networkHashrate, unit)
+                .divide(new BigDecimal("8"), 20, RoundingMode.HALF_UP);
+        return formatHashrate(poolHashH, "H");
     }
 
     private BigDecimal toH(BigDecimal value, String unit) {

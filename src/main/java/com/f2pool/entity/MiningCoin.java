@@ -48,4 +48,15 @@ public class MiningCoin {
     private String nextDifficulty; // e.g. "145.59 T"
     private BigDecimal nextDifficultyChange; // e.g. 0.83 (%)
     private String difficultyAdjustmentTime; // e.g. "3天9小时" or timestamp
+    @TableField(exist = false)
+    private String blockReward;
+
+    @TableField(exist = false)
+    private String blockTime;
+
+    @TableField(exist = false)
+    private String estimatedDailyOutputCoin;
+
+    @TableField(exist = false)
+    private String feeRate;
 }
