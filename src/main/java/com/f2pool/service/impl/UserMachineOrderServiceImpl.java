@@ -55,6 +55,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
     private static final int RECOVER_LOCK_DAYS = 180;
     private static final int FULL_REFUND_DAYS = 365;
     private static final BigDecimal EARLY_RECOVER_RATE = new BigDecimal("0.97");
+    private static final int REVENUE_WITHDRAW_COOLDOWN_DAYS = 30;
 
     @Autowired
     private IMiningMachineService miningMachineService;
@@ -334,6 +335,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
             throw new IllegalArgumentException("该订单不属于当前用户");
         }
         userFeatureRestrictionService.assertRevenueWithdrawAllowed(order.getUserId());
+        assertRevenueWithdrawAllowedByCooldown(order.getUserId());
         BigDecimal withdrawable = getWithdrawableRevenue(order);
         if (withdrawable.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("暂无可提现收益");
@@ -367,6 +369,7 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
             throw new IllegalArgumentException("用户编号不能为空");
         }
         userFeatureRestrictionService.assertRevenueWithdrawAllowed(request.getUserId());
+        assertRevenueWithdrawAllowedByCooldown(request.getUserId());
         List<UserMachineOrder> allOrders = list(new QueryWrapper<UserMachineOrder>()
                 .eq("user_id", request.getUserId())
                 .in("status", 1, 2, 3)
@@ -621,6 +624,49 @@ public class UserMachineOrderServiceImpl extends ServiceImpl<UserMachineOrderMap
 
     private BigDecimal safe(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private void assertRevenueWithdrawAllowedByCooldown(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("用户编号不能为空");
+        }
+
+        WithdrawOrder pendingOrder = withdrawOrderMapper.selectOne(
+                new QueryWrapper<WithdrawOrder>()
+                        .eq("user_id", userId)
+                        .eq("source_type", WITHDRAW_SOURCE_MACHINE_REVENUE)
+                        .eq("status", 0)
+                        .orderByDesc("id")
+                        .last("limit 1")
+        );
+        if (pendingOrder != null) {
+            throw new IllegalArgumentException("30天内只能提取一笔，当前有一笔收益提取正在审核中，请等待审核完成后再操作");
+        }
+
+        WithdrawOrder approvedOrder = withdrawOrderMapper.selectOne(
+                new QueryWrapper<WithdrawOrder>()
+                        .eq("user_id", userId)
+                        .eq("source_type", WITHDRAW_SOURCE_MACHINE_REVENUE)
+                        .eq("status", 1)
+                        .orderByDesc("audit_time")
+                        .orderByDesc("id")
+                        .last("limit 1")
+        );
+        if (approvedOrder == null) {
+            return;
+        }
+
+        Date baseTime = approvedOrder.getAuditTime() != null ? approvedOrder.getAuditTime() : approvedOrder.getCreateTime();
+        if (baseTime == null) {
+            return;
+        }
+
+        LocalDate nextAvailableDate = baseTime.toInstant().atZone(CN_ZONE).toLocalDate().plusDays(REVENUE_WITHDRAW_COOLDOWN_DAYS);
+        LocalDate today = LocalDate.now(CN_ZONE);
+        long remainingDays = ChronoUnit.DAYS.between(today, nextAvailableDate);
+        if (remainingDays > 0) {
+            throw new IllegalArgumentException("30天内只能提取一笔，还需" + remainingDays + "天后才可以继续提取");
+        }
     }
 
     private long calcHoldDays(Date createTime, Date now) {
