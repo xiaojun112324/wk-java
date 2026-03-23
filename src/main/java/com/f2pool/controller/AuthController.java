@@ -6,6 +6,8 @@ import com.f2pool.common.R;
 import com.f2pool.common.TokenContextUtil;
 import com.f2pool.dto.auth.LoginRequest;
 import com.f2pool.dto.auth.RegisterRequest;
+import com.f2pool.dto.auth.ResetPasswordByEmailRequest;
+import com.f2pool.dto.auth.SendEmailCodeRequest;
 import com.f2pool.dto.auth.UpdateLoginPasswordRequest;
 import com.f2pool.dto.auth.UpdateWithdrawPasswordRequest;
 import com.f2pool.entity.SysUser;
@@ -25,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.HashMap;
 import java.util.Map;
 
-@Api(tags = "用户认证接口")
+@Api(tags = "User auth API")
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -39,31 +41,43 @@ public class AuthController {
     @Autowired
     private TokenContextUtil tokenContextUtil;
 
-    @ApiOperation("用户注册（账号/邮箱/密码，可选邀请码）")
+    @ApiOperation("Register user")
     @PostMapping("/register")
     public R<Map<String, Object>> register(@RequestBody RegisterRequest request) {
         return R.ok(userAuthService.register(request));
     }
 
-    @ApiOperation("用户登录（账号或邮箱+密码）")
+    @ApiOperation("Login user")
     @PostMapping("/login")
     public R<Map<String, Object>> login(@RequestBody LoginRequest request) {
         return R.ok(userAuthService.login(request));
     }
 
-    @ApiOperation("根据 JWT 获取当前用户信息")
+    @ApiOperation("Send email code")
+    @PostMapping("/email-code/send")
+    public R<Map<String, Object>> sendEmailCode(@RequestBody SendEmailCodeRequest request) {
+        return R.ok(userAuthService.sendEmailCode(request));
+    }
+
+    @ApiOperation("Reset login password by email code")
+    @PostMapping("/password/login/reset-by-email")
+    public R<Map<String, Object>> resetPasswordByEmail(@RequestBody ResetPasswordByEmailRequest request) {
+        return R.ok(userAuthService.resetPasswordByEmail(request));
+    }
+
+    @ApiOperation("Get current user by JWT")
     @GetMapping("/me")
     public R<Map<String, Object>> me(@RequestHeader("Authorization") String authorization) {
         String token = jwtTokenUtil.extractToken(authorization);
         Claims claims = jwtTokenUtil.parseClaims(token);
         Object uid = claims.get("uid");
         if (uid == null) {
-            throw ApiException.unauthorized("无效令牌：缺少用户标识");
+            throw ApiException.unauthorized("invalid token: missing uid");
         }
         Long userId = Long.valueOf(String.valueOf(uid));
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null) {
-            throw ApiException.notFound("用户不存在");
+            throw ApiException.notFound("user not found");
         }
 
         Map<String, Object> data = new HashMap<>();
@@ -80,30 +94,30 @@ public class AuthController {
         return R.ok(data);
     }
 
-    @ApiOperation("修改登录密码")
+    @ApiOperation("Update login password")
     @PostMapping("/password/login/update")
     public R<Map<String, Object>> updateLoginPassword(@RequestHeader("Authorization") String authorization,
-                                                       @RequestBody UpdateLoginPasswordRequest request) {
+                                                      @RequestBody UpdateLoginPasswordRequest request) {
         Long userId = tokenContextUtil.requireUserId(authorization);
         return R.ok(userAuthService.updateLoginPassword(userId, request));
     }
 
-    @ApiOperation("设置/修改资金密码")
+    @ApiOperation("Set or update withdraw password")
     @PostMapping("/password/withdraw/update")
     public R<Map<String, Object>> updateWithdrawPassword(@RequestHeader("Authorization") String authorization,
-                                                          @RequestBody UpdateWithdrawPasswordRequest request) {
+                                                         @RequestBody UpdateWithdrawPasswordRequest request) {
         Long userId = tokenContextUtil.requireUserId(authorization);
         return R.ok(userAuthService.updateWithdrawPassword(userId, request));
     }
 
-    @ApiOperation("资金密码设置状态")
+    @ApiOperation("Get withdraw password status")
     @GetMapping("/password/withdraw/status")
     public R<Map<String, Object>> withdrawPasswordStatus(@RequestHeader("Authorization") String authorization) {
         Long userId = tokenContextUtil.requireUserId(authorization);
         return R.ok(userAuthService.getWithdrawPasswordStatus(userId));
     }
 
-    @ApiOperation("用户退出登录")
+    @ApiOperation("Logout user")
     @PostMapping("/logout")
     public R<Map<String, Object>> logout() {
         Map<String, Object> data = new HashMap<>();

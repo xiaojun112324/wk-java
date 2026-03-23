@@ -18,31 +18,28 @@ import java.util.Map;
 @Component
 public class JwtTokenUtil {
 
+    private static final String ROLE_USER = "USER";
+    private static final long DEFAULT_USER_EXPIRE_SECONDS = 30L * 24 * 60 * 60;
+
     @Value("${jwt.secret}")
     private String jwtSecret;
 
     @Value("${jwt.expire-seconds:604800}")
     private long expireSeconds;
 
+    @Value("${jwt.user-expire-seconds:2592000}")
+    private long userExpireSeconds;
+
     public String generateToken(Long userId, String username, String role) {
-        Instant now = Instant.now();
-        Instant expireAt = now.plusSeconds(expireSeconds);
-
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("uid", userId);
-        claims.put("role", role);
-
-        return Jwts.builder()
-                .claims(claims)
-                .subject(username)
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(expireAt))
-                .signWith(buildKey())
-                .compact();
+        return generateToken(userId, username, role, resolveExpireSeconds(role));
     }
 
     public long getExpireSeconds() {
         return expireSeconds;
+    }
+
+    public long getExpireSeconds(String role) {
+        return resolveExpireSeconds(role);
     }
 
     public Claims parseClaims(String token) {
@@ -72,6 +69,30 @@ public class JwtTokenUtil {
             throw ApiException.unauthorized("令牌不能为空");
         }
         return value;
+    }
+
+    private String generateToken(Long userId, String username, String role, long ttlSeconds) {
+        Instant now = Instant.now();
+        Instant expireAt = now.plusSeconds(ttlSeconds);
+
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("uid", userId);
+        claims.put("role", role);
+
+        return Jwts.builder()
+                .claims(claims)
+                .subject(username)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(expireAt))
+                .signWith(buildKey())
+                .compact();
+    }
+
+    private long resolveExpireSeconds(String role) {
+        if (ROLE_USER.equalsIgnoreCase(role)) {
+            return userExpireSeconds > 0 ? userExpireSeconds : DEFAULT_USER_EXPIRE_SECONDS;
+        }
+        return expireSeconds;
     }
 
     private SecretKey buildKey() {

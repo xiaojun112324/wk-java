@@ -2,7 +2,9 @@ package com.f2pool.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.f2pool.dto.auth.LoginRequest;
+import com.f2pool.dto.auth.ResetPasswordByEmailRequest;
 import com.f2pool.dto.auth.RegisterRequest;
+import com.f2pool.dto.auth.SendEmailCodeRequest;
 import com.f2pool.dto.auth.UpdateLoginPasswordRequest;
 import com.f2pool.dto.auth.UpdateWithdrawPasswordRequest;
 import com.f2pool.entity.SysUser;
@@ -13,6 +15,10 @@ public interface IUserAuthService extends IService<SysUser> {
     Map<String, Object> register(RegisterRequest request);
 
     Map<String, Object> login(LoginRequest request);
+
+    Map<String, Object> sendEmailCode(SendEmailCodeRequest request);
+
+    Map<String, Object> resetPasswordByEmail(ResetPasswordByEmailRequest request);
 
     Map<String, Object> updateLoginPassword(Long userId, UpdateLoginPasswordRequest request);
 
